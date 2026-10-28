@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+output/
+*.zip
+settings.local.json
+tatto studio User Data/
+Tattoo Library/
+*-snapshot.json

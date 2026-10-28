@@ -1,0 +1,296 @@
+{
+  "release_sha256": "16e54bc53006c38bc5a9b5a196dc049be8ce2c6f0bc8f30231456e7c68dd9438",
+  "scope": "All files beginning with the Windows MZ executable header in the matching release; binaries are not uploaded here.",
+  "files": [
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_asyncio.pyd",
+      "sha256": "6b9cb4b3dafdf559777a08ed0529cb8669173bc85290817b167a00668b23f8e5",
+      "bytes": 75056
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_bz2.pyd",
+      "sha256": "74d7400786810eebb818d34f1dbb3f5c030be84c0051970f3a9efdee9ce2d8ea",
+      "bytes": 88880
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_ctypes.pyd",
+      "sha256": "fc308aac12c2c78ee5c12b617b8bbf606758de6ef2e8846f836e7a88ffe87f44",
+      "bytes": 131888
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_decimal.pyd",
+      "sha256": "851d955db66b3c136e106ade17ad1709c0a8c2264dc971123798ae5f7a903e13",
+      "bytes": 263984
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_elementtree.pyd",
+      "sha256": "df07d9e114b99411decec48f0f9cd74002240851dd9d25118436055118a78db7",
+      "bytes": 137520
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_hashlib.pyd",
+      "sha256": "60570ffbff38c8625aa104eb1156cae2673ed0519c65ba8ce299f0ea6f458816",
+      "bytes": 70448
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_lzma.pyd",
+      "sha256": "dbb3de2695a29d50d7d969b1d262583685d3988a5c373e0cf5f5bb9fd390c2ff",
+      "bytes": 168240
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_msi.pyd",
+      "sha256": "2f3730d0ebf3add33c68cd49b7a9eedb35fcea5becfa99a99827db88c9db358d",
+      "bytes": 48944
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_multiprocessing.pyd",
+      "sha256": "87a57a3530af0ecf24e097b2926de2f57ba63df87ae0176ec189ec2d150dea90",
+      "bytes": 39728
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_overlapped.pyd",
+      "sha256": "4aa3ceb250bbd848b4bf5a0561a7ac46469312ccf04166f48da8edbd172bc1ad",
+      "bytes": 59696
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_queue.pyd",
+      "sha256": "9743937fe444e4ba22b2abb73b2dcbabc055a459bb1c4866b9bcc9c169396407",
+      "bytes": 36144
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_socket.pyd",
+      "sha256": "ed44327a6440523e8714ef30dc4af468339fbe0cb39dad81d7fefea608259204",
+      "bytes": 87344
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_sqlite3.pyd",
+      "sha256": "296d11fcb452528a750f97bca64083171551ac7793e6d4299c641d8f1404dc80",
+      "bytes": 127792
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_ssl.pyd",
+      "sha256": "547e4613198632c9739b20f093aa14d0103b8969196b7d0a37dfac5905069dbe",
+      "bytes": 180528
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_tkinter.pyd",
+      "sha256": "d67cd476fc464bf54fdf2a41545aaa64c07c0491abbfa34daf21aabdf54b8573",
+      "bytes": 70960
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_uuid.pyd",
+      "sha256": "a6bb9522afcc2833a098100960bfca94b755c39f1cf29e374d7cf551ed9e157e",
+      "bytes": 29488
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_wmi.pyd",
+      "sha256": "8471433bbb87c9ad3581ec2c1a71b3be20a81104f1ddcaa2514e89a3a29c5b5b",
+      "bytes": 41264
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/_zoneinfo.pyd",
+      "sha256": "7d87152c88744e53894ec255a2ca7a1d2d208d64ee2d674a5e11d1d865274bc0",
+      "bytes": 52016
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/libcrypto-3-x64.dll",
+      "sha256": "836cfdd01dc3252417b2880bfdd5bb8a2dbde8b5da9583c2fb7def534c5eca9f",
+      "bytes": 8003376
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/libffi-8.dll",
+      "sha256": "9034f55feed4fd07c334b6ec77814bde51d8212ae3d71febe30592e1259ecce4",
+      "bytes": 43824
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/libssl-3-x64.dll",
+      "sha256": "63262035f81565bae336dc9be2f6403f1adcd6cf52d447b85c9e28352a39911e",
+      "bytes": 1599280
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/pyexpat.pyd",
+      "sha256": "786a233620f13f7578003cb8a216c95969ea6df2a00c8ba86342612fac90035f",
+      "bytes": 226096
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/select.pyd",
+      "sha256": "06d9bede4d10609bcef1ae3f73d91eefb200aab5a2a94a18538cb0553f8a5ffa",
+      "bytes": 34608
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/sqlite3.dll",
+      "sha256": "c145910db0ee9ae8c9ee836d64fa8b891ec290642903505d85f6694f9ce15e73",
+      "bytes": 1623344
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/tcl86t.dll",
+      "sha256": "fbfd065f861ec0a90dd513bc209c56bbc23c54d2839964a0ec2df95848af7860",
+      "bytes": 1866480
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/tk86t.dll",
+      "sha256": "cd2f60075064dfc2e65c88b239a970cb4bd07cb3eec7cc26fb1bf978d4356b08",
+      "bytes": 1541872
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/unicodedata.pyd",
+      "sha256": "15de2bfd54ad85e7cc8cb3afcc2b9c23c9d7c98c94af355e3e6cc23178652c04",
+      "bytes": 1143600
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/DLLs/winsound.pyd",
+      "sha256": "a03a6b876e067ca30c36fe71a3198a20ca98dba7b46aa38d920e2eb4b4038710",
+      "bytes": 34096
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_avif.cp312-win_amd64.pyd",
+      "sha256": "fdb3aff25d5ebb849199367e74f50849525f80ad69860d363cbae9373b0442eb",
+      "bytes": 7909168
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_imaging.cp312-win_amd64.pyd",
+      "sha256": "7d5bb1fa6be49f6a402f61938e85c224dc4d17f957535fedf04c3d7b83930ea5",
+      "bytes": 2648368
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_imagingcms.cp312-win_amd64.pyd",
+      "sha256": "63f98bf0c8dc664a194ef313c5bfc998dd364fe9057d825a784be95bf26df276",
+      "bytes": 288048
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_imagingft.cp312-win_amd64.pyd",
+      "sha256": "4ebd8fbc2c2499aa852a27afeb17b2c8a2e6a21cf24ab8bc0b63930398e27c27",
+      "bytes": 2190640
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_imagingmath.cp312-win_amd64.pyd",
+      "sha256": "0d7f754d911196fd28c3de7732898d5bd33063c2923ca349a89f240c66fc5027",
+      "bytes": 37168
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_imagingmorph.cp312-win_amd64.pyd",
+      "sha256": "a1aed40cfb31e192d8eebcb1dec30a7c419e7c7fd10f6204bfadbb6e6099c1af",
+      "bytes": 27952
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_imagingtk.cp312-win_amd64.pyd",
+      "sha256": "0573f6c6943a4b8c871390df6e6a827cb4f39d018596907f4d0d7d52761f897f",
+      "bytes": 30512
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/PIL/_webp.cp312-win_amd64.pyd",
+      "sha256": "17a967b27c52d7b278fdaa8279c0ebdfcf4b69df80ee410b0a3369656d4fa76c",
+      "bytes": 431920
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy.libs/libscipy_openblas64_-9e3e5a4229c1ca39f10dc82bba9e2b2b.dll",
+      "sha256": "0e3edf17ef2321e8ae882283213c238330c0ecb08f87813b3dff9f05231fd129",
+      "bytes": 20419376
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll",
+      "sha256": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde",
+      "bytes": 575056
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/_core/_multiarray_umath.cp312-win_amd64.pyd",
+      "sha256": "c196fc778318d8dcf620867d7d628addcb3abb9ea99d235e8103c706a61a7af8",
+      "bytes": 4544816
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/_core/_simd.cp312-win_amd64.pyd",
+      "sha256": "fb09a98848426918dbf54897a2a562566c518ed9b43b728f4d54beb64e4af257",
+      "bytes": 2426160
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/fft/_pocketfft_umath.cp312-win_amd64.pyd",
+      "sha256": "bb6c563f0fac979374b5b2525604e238c6afcf59d36fb470482a94ab316130a4",
+      "bytes": 292144
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/linalg/_umath_linalg.cp312-win_amd64.pyd",
+      "sha256": "34a31a96f1e4da16a502347a20a95aa7b35a6e6ed3adc3a10b82bd3dc40b17db",
+      "bytes": 127792
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/linalg/lapack_lite.cp312-win_amd64.pyd",
+      "sha256": "be319e991bb3dc77c88fe3d533db338d4df173f61a4e1b96c711d9a12ba123af",
+      "bytes": 34096
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_bounded_integers.cp312-win_amd64.pyd",
+      "sha256": "36cab0597ac8f16f72e7ca16763f9af616101753751d8570af355fa22388eb1e",
+      "bytes": 223024
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_common.cp312-win_amd64.pyd",
+      "sha256": "b0dbf669852835a9aad407d9da99102e1e4d29eca840d4783ce8018523edc9e7",
+      "bytes": 175920
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_generator.cp312-win_amd64.pyd",
+      "sha256": "8a72f915218244cb09046858d112d6e128591754109a556b4fc80e6f4f458fa7",
+      "bytes": 600880
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_mt19937.cp312-win_amd64.pyd",
+      "sha256": "09759a3ec9d188e9291c131b231ceaf76e6c918419f3d4fbb7bb6617f36f165d",
+      "bytes": 99632
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_pcg64.cp312-win_amd64.pyd",
+      "sha256": "821e0ea62f17407f9f595c8e4f6ed5679c74122c6e5dfc4a4b33c87a368b136d",
+      "bytes": 110384
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_philox.cp312-win_amd64.pyd",
+      "sha256": "2b60fd254ac3b76f41a3d09f17c2d0763258b22489db16a1ecc1d4ee2ac2db67",
+      "bytes": 94000
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/_sfc64.cp312-win_amd64.pyd",
+      "sha256": "aed21005f9dbd67c7e7f891df4768b8112cd2a435b92a3413550b2a94342427b",
+      "bytes": 75568
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/bit_generator.cp312-win_amd64.pyd",
+      "sha256": "d446e4130b02ae91104ea9077caca80d082e808e561fb4f73d07b676e8bb6089",
+      "bytes": 173872
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/Lib/site-packages/numpy/random/mtrand.cp312-win_amd64.pyd",
+      "sha256": "35e662d749ddcc8c9bd981b3c23ef4bc5a7c3c45a60bd99bdd7e255d4a5472af",
+      "bytes": 497968
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/python.exe",
+      "sha256": "b07b03b9ba866a341a3c13ee69710fbc8d43d4ce2523dee13f6df5c25378d15b",
+      "bytes": 107304
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/python3.dll",
+      "sha256": "f91ca7e29e8b4cc9ed7a4a935c1b2558c5c8f23398cb20d7048f977aa16fce8b",
+      "bytes": 71984
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/python312.dll",
+      "sha256": "3b33d49d879dbf3a8aa3fff1bf3859275e76c188a3adec4e7ffe728243652a87",
+      "bytes": 6985520
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/pythonw.exe",
+      "sha256": "ea3541aa0609bdd9217e8d3919f787b11df301790930260acb677decbd562d1d",
+      "bytes": 105776
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/vcruntime140.dll",
+      "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+      "bytes": 124544
+    },
+    {
+      "path": "tools/tatto studio/runtime/python/vcruntime140_1.dll",
+      "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+      "bytes": 49792
+    }
+  ]
+}
