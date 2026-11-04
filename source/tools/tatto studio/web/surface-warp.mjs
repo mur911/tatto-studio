@@ -1,6 +1,7 @@
 // Intrinsic surface charts. No camera projection, extra texture sampler, or
 // modification of the character mesh is involved in these editable coordinates.
 import {dot,cross,unit,rotateVector} from './transform-math.mjs';
+export const WARP_VERSION=2;
 const add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(v,s)=>v.map(x=>x*s);
 const graphs=new WeakMap(),charts=new WeakMap();
 export const defaultWarpPoints=()=>Array.from({length:9},(_,i)=>[(i%3)/2,Math.floor(i/3)/2]);
@@ -71,14 +72,24 @@ function develop(layer,graph,requestedRadius=0){
    dist[other]=next;u[other]=u[id]+dx;v[other]=v[id]+dy;frames[other]=br;heap.push(other,next);
   }
  }
- // Relax loop inconsistencies in the transported chart without snapping a
- // non-planar patch back to a flat camera projection.
- const equations=new Map();for(const id of visited){const node=nodes[id],list=[];for(const [other,length]of node.edges){if(!frames[other]||dist[other]>radius)continue;const b=nodes[other],right=unit(add(frames[id],frames[other])),up=unit(add(cross(node.n,frames[id]),cross(b.n,frames[other]))),delta=sub(b.p,node.p);let dx=dot(delta,right),dy=dot(delta,up);const scale=length/Math.max(1e-8,Math.hypot(dx,dy));list.push([other,dx*scale,dy*scale,1/Math.max(.002,length)])}equations.set(id,list)}
+ // A shortest-path chart has a cut where paths around a closed body meet.
+ // Relaxing across that cut pulls the remote chest back into a back tattoo.
+ // Keep local smoothing, but never average or interpolate across these joins.
+ const cuts=new Set(),edgeKey=(a,b)=>a<b?a+':'+b:b+':'+a,equations=new Map();
+ for(const id of visited){const node=nodes[id],list=[];for(const [other,length]of node.edges){if(!frames[other]||dist[other]>radius)continue;const b=nodes[other],right=unit(add(frames[id],frames[other])),up=unit(add(cross(node.n,frames[id]),cross(b.n,frames[other]))),delta=sub(b.p,node.p);let dx=dot(delta,right),dy=dot(delta,up);const scale=length/Math.max(1e-8,Math.hypot(dx,dy));dx*=scale;dy*=scale;
+   if(Math.hypot(u[other]-u[id]-dx,v[other]-v[id]-dy)>Math.max(.003,length*1.5)){cuts.add(edgeKey(id,other));continue}
+   list.push([other,dx,dy,1/Math.max(.002,length)])}equations.set(id,list)}
+ for(const [id,list]of equations)equations.set(id,list.filter(([other])=>!cuts.has(edgeKey(id,other))));
  for(let pass=0;pass<32;pass++)for(const id of visited){if(id===seed)continue;let x=0,y=0,total=0;for(const [other,dx,dy,w]of equations.get(id)){x+=(u[other]-dx)*w;y+=(v[other]-dy)*w;total+=w}if(total){u[id]=u[id]*.3+x/total*.7;v[id]=v[id]*.3+y/total*.7}}
  const cs=Math.cos((layer.angle||0)*Math.PI/180),sn=Math.sin((layer.angle||0)*Math.PI/180),mapped=new Map();
  for(const [part,ids]of partMaps){const uv=new Float32Array(ids.length*3);for(let i=0;i<ids.length;i++){const id=ids[i];if(!frames[id]||dist[id]>radius)continue;uv[i*3]=(u[id]*cs+v[id]*sn)/(layer.width/100)+.5;uv[i*3+1]=(-u[id]*sn+v[id]*cs)/(layer.height/100)+.5;uv[i*3+2]=1}mapped.set(part,uv)}
  const distances=new Map();for(const [part,ids]of partMaps)distances.set(part,Float32Array.from(ids,id=>dist[id]));
- return {graph,base:mapped,distances,radius,visited:visited.length};
+ const triangleValidity=new Map(),rejected=new Map();
+ for(const [part,ids]of partMaps){const indices=part.indices,valid=new Uint8Array(indices.length/3).fill(1),bad=[],offsets=[];
+  for(let j=0;j<indices.length;j+=3){const a=ids[indices[j]],b=ids[indices[j+1]],c=ids[indices[j+2]],uv=mapped.get(part),covered=uv[indices[j]*3+2]&&uv[indices[j+1]*3+2]&&uv[indices[j+2]*3+2],allowed=!(cuts.has(edgeKey(a,b))||cuts.has(edgeKey(b,c))||cuts.has(edgeKey(c,a)))&&(!covered||chartTriangleFacing(part,uv,indices.subarray(j,j+3),graph.pose));valid[j/3]=allowed?1:0;if(!allowed){bad.push(indices[j],indices[j+1],indices[j+2]);offsets.push(j)}}
+  triangleValidity.set(part,valid);if(bad.length)rejected.set(part,{indices:new Uint32Array(bad),offsets:new Uint32Array(offsets),segments:new Map()});
+ }
+ return {graph,base:mapped,distances,triangleValidity,rejected,cuts,cutEdges:cuts.size,radius,visited:visited.length};
 }
 function warpRadius(layer){const points=layer.warp?.points||defaultWarpPoints(),extent=Math.max(...points.map(q=>Math.hypot((q[0]-.5)*layer.width,(q[1]-.5)*layer.height)))/100;return Math.max(Math.hypot(layer.width,layer.height)/100*.8+.02,extent*1.35+.03,Number.isFinite(layer.warp?.domainRadius)?layer.warp.domainRadius:0)}
 const controlTriangles=Array.from({length:4},(_,i)=>{const a=Math.floor(i/2)*3+i%2;return [[a,a+1,a+4],[a,a+4,a+3]]}).flat();
@@ -102,7 +113,7 @@ export function prepareWarp(layer,parts){
  if(layer?.projection!=='warp'||!layer.placed)return null;
  const graph=graphFor(parts,layer.placementPose||'rest'),signature=JSON.stringify([layer.center,layer.right,layer.up,layer.normal,layer.width,layer.height,layer.angle,layer.part,layer.targetAtlas]);let entry=charts.get(layer);
  if(!entry||entry.graph!==graph||entry.signature!==signature){entry={...develop(layer,graph),signature};charts.set(layer,entry)}
- else if(Math.abs(warpRadius(layer)-entry.radius)>1e-6){entry={...develop(layer,graph,warpRadius(layer)),signature};charts.set(layer,entry)}
+ else if(warpRadius(layer)>entry.radius+1e-6){entry={...develop(layer,graph,warpRadius(layer)),signature};charts.set(layer,entry)}
  const points=layer.warp?.points||defaultWarpPoints(),stamp=JSON.stringify(points);
  if(entry.stamp!==stamp){const inverse=warpTransform(points);entry.mapped=new Map();for(const [part,uv]of entry.base){const result=new Float32Array(uv);for(let i=0;i<uv.length;i+=3)if(uv[i+2]){const q=inverse([uv[i],uv[i+1]]);result[i]=q[0];result[i+1]=q[1]}entry.mapped.set(part,result)}entry.stamp=stamp}
  return entry;
@@ -142,8 +153,15 @@ export function warpHit(layer,hit,base=false){
  const entry=charts.get(layer),part=hit.partObject,uv=(base?entry?.base:entry?.mapped)?.get(part);if(!uv||!hit.triangle||!hit.weights)return null;
  // Pin placement follows the picked skin, including a chart cut. Rendering
  // still rejects inverted triangles; it must not impose a dragging boundary.
- if(!base&&!chartTriangleFacing(part,uv,hit.triangle,layer.placementPose||'rest'))return null;
+ if(!base){const ids=entry.graph.partMaps.get(part),nodes=hit.triangle.map(id=>ids[id]);if(nodes.some((id,i)=>entry.cuts.has(id<nodes[(i+1)%3]?id+':'+nodes[(i+1)%3]:nodes[(i+1)%3]+':'+id))||!chartTriangleFacing(part,uv,hit.triangle,layer.placementPose||'rest'))return null;}
  const result=[0,0,0];for(let i=0;i<3;i++)for(let j=0;j<3;j++)result[j]+=uv[hit.triangle[i]*3+j]*hit.weights[i];return result[2]>.999?result.slice(0,2):null;
+}
+export function warpRejectedIndices(entry,part,segment=null){
+ const bad=entry?.rejected.get(part);if(!bad)return null;
+ if(!segment)return bad.indices;
+ const first=segment.first??0,end=first+(segment.count??part.indices.length),key=first+':'+end;if(bad.segments.has(key))return bad.segments.get(key);
+ const lower=value=>{let a=0,b=bad.offsets.length;while(a<b){const mid=(a+b)>>>1;if(bad.offsets[mid]<value)a=mid+1;else b=mid}return a};
+ const result=bad.indices.subarray(lower(first)*3,lower(end)*3);bad.segments.set(key,result);return result;
 }
 // UV gradient per metre on the actual triangle, including control-grid edits.
 // This keeps a centimetre brush independent of skin UV seams and chart scale.
@@ -180,7 +198,7 @@ export function warpSurfacePoint(layer,parts,q,displayPose='rest'){
  const entry=prepareWarp(layer,parts);if(!entry)return null;
  if(!entry.hitGrid){
   entry.hitGrid=new Map();entry.wideTriangles=[];
-  for(const [part,uv]of entry.base){const ids=part.indices;for(let j=0;j<ids.length;j+=3){const a=ids[j]*3,b=ids[j+1]*3,c=ids[j+2]*3;if(!uv[a+2]||!uv[b+2]||!uv[c+2]||!chartTriangleFacing(part,uv,ids.subarray(j,j+3),layer.placementPose||'rest'))continue;const item={part,uv,ids:ids.subarray(j,j+3)},lo=[Math.floor(Math.min(uv[a],uv[b],uv[c])*8),Math.floor(Math.min(uv[a+1],uv[b+1],uv[c+1])*8)],hi=[Math.floor(Math.max(uv[a],uv[b],uv[c])*8),Math.floor(Math.max(uv[a+1],uv[b+1],uv[c+1])*8)];
+  for(const [part,uv]of entry.base){const ids=part.indices;for(let j=0;j<ids.length;j+=3){const a=ids[j]*3,b=ids[j+1]*3,c=ids[j+2]*3;if(!entry.triangleValidity.get(part)?.[j/3]||!uv[a+2]||!uv[b+2]||!uv[c+2]||!chartTriangleFacing(part,uv,ids.subarray(j,j+3),layer.placementPose||'rest'))continue;const item={part,uv,ids:ids.subarray(j,j+3)},lo=[Math.floor(Math.min(uv[a],uv[b],uv[c])*8),Math.floor(Math.min(uv[a+1],uv[b+1],uv[c+1])*8)],hi=[Math.floor(Math.max(uv[a],uv[b],uv[c])*8),Math.floor(Math.max(uv[a+1],uv[b+1],uv[c+1])*8)];
     if((hi[0]-lo[0]+1)*(hi[1]-lo[1]+1)>256){entry.wideTriangles.push(item);continue}
     for(let x=lo[0];x<=hi[0];x++)for(let y=lo[1];y<=hi[1];y++){const key=x+','+y;if(!entry.hitGrid.has(key))entry.hitGrid.set(key,[]);entry.hitGrid.get(key).push(item)}
   }}

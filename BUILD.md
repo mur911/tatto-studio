@@ -1,44 +1,37 @@
-# Verify and reconstruct the matching release
+# Verify and reconstruct Tatto Studio 1.0.1
 
-## 1. Verify source against the distributed archive
+The matching input is `Tatto Studio 1.0.1.zip`, SHA-256:
+`b3b090532721b7a3b8b7762bfad79cf4d8247bc0a7850124d299f3bee125ce15`.
 
-Use Python 3.12 or later. This verification uses only the standard library:
+## Verify reviewed source against the submitted ZIP
 
-```powershell
-python scripts/verify_release.py "C:\Downloads\Tatto Studio 1.0.0.zip"
-```
-
-The script verifies the complete archive SHA-256 and compares every mapped source file byte-for-byte.
-It does not execute the editor, game, or third-party binaries.
-
-## 2. Reconstruct the release from reviewed code and the published resource bundle
+Use Python 3.12; the scripts use only its standard library.
 
 ```powershell
-python scripts/rebuild_release.py --base "C:\Downloads\Tatto Studio 1.0.0.zip" --output "C:\Downloads\Tatto Studio 1.0.0.rebuilt.zip"
+python scripts/verify_release.py "C:\Downloads\Tatto Studio 1.0.1.zip"
 ```
 
-This keeps the matching distribution's omitted runtime, resource templates, and branding, replaces
-all mapped code with this repository's copies, refreshes the editor file manifest, and creates a
-standard ZIP. With the unmodified release source, the output must match the published SHA-256 exactly.
-It writes a new output file and refuses to overwrite an existing file or the input.
+This checks the complete ZIP hash, CRCs, source hashes and every mapped file's bytes. It does not execute
+the editor or third-party binaries. `source-map.json` includes the Python/CMD backend, web code, message
+and release JSON, installer metadata, Lua collector and redscript bridge.
 
-There is no custom EXE build step. The launchers are CMD files, the editor/backend are JavaScript and
-Python, and the CET collector uses Lua. The resource bridge is supplied as `.reds` source, compiled
-by the separately installed redscript framework when the game starts. This repository does not
-include source builds of CPython, NumPy or Pillow, or independently recreate omitted game templates.
-
-## 3. Run the editor for inspection
-
-Extract the complete distribution into a test directory and run `Start tatto studio.cmd`.
-For isolated inspection, set `TATTO_STUDIO_DATA_DIR` to an absolute writable folder outside the
-program directory before launching. This avoids opening the normal user's tattoo library.
-
-Alternatively, a Windows x64 Python 3.12 environment can run the backend after installing
-`requirements.txt`, using the reviewed source overlaid on the distribution's resource files:
+## Reconstruct the exact ZIP
 
 ```powershell
-python -B server.py --port 8876
+python scripts/rebuild_release.py --base "C:\Downloads\Tatto Studio 1.0.1.zip" --output "C:\Downloads\Tatto Studio 1.0.1.rebuilt.zip"
 ```
 
-The CMD launcher specifically expects the bundled runtime. A functioning game installation and
-WolvenKit CLI are needed for character extraction and mod generation, not for source verification.
+Use the release's Python 3.12.14 runtime for the tested compression environment. The script preserves
+the input archive's entry metadata and omitted resources, overlays the reviewed source and refreshes
+the existing application manifest. With unchanged reviewed source, the rebuilt SHA-256 must match
+the submitted ZIP exactly. It refuses an existing output path and never overwrites the input.
+
+This is verification/reconstruction from the submitted resource bundle, **not** a standalone source
+build of the bundled runtime, native libraries, branding or game resource templates. Upstream links
+and binary hashes are provided separately. No custom application EXE is compiled.
+
+## Optional application inspection
+
+Extract the complete release to a test directory and run `tools/tatto studio/Start tatto studio.cmd`.
+Normal game resource import/export needs the separately installed dependencies and a user-provided game.
+Neither is needed for the two verification scripts above.

@@ -1,6 +1,6 @@
 -- Read-only snapshots through CET + Codeware. No RedHotTools dependency.
 local Ref = require('libs/Ref')
-local VERSION = '0.4.0'
+local VERSION = '0.5.0'
 local session = tostring(os.time()) .. ':' .. tostring(os.clock())
 local preview, elapsed, lastError = nil, 0, nil
 
@@ -70,6 +70,46 @@ local function readComponent(entity, component)
     return item
 end
 
+local function readReference(reference)
+    local ok, hash = pcall(function() return tostring(reference.hash) end)
+    if not ok or not hash:match('^%d+[uUlL]*$') then return nil end
+    return {hash = hash:gsub('[uUlL]', '')}
+end
+
+local function animationReference(entity, component, graph)
+    local ok, resource = pcall(function() return entity:TattoStudioGetAnimationResource(component, graph) end)
+    if ok and defined(resource) then
+        local result = readReference(resource)
+        if result and type(resource.path) == 'string' and resource.path ~= '' then result.path = resource.path end
+        if result then return result end
+    end
+    if graph then return readReference(component.graph) end
+    return readReference(component.rig)
+end
+
+local function readAnimation(entity, component)
+    if not component:IsA('entAnimatedComponent') then return nil end
+    local item = {name = name(component:GetName()), type = name(component:GetClassName())}
+    if item.name == '' or item.name == 'root' or item.name:find('tatto_studio_', 1, true) then return nil end
+    pcall(function() item.rig = animationReference(entity, component, false) end)
+    if not item.rig or item.rig.hash:match('^0+$') then return nil end
+    pcall(function() item.graph = animationReference(entity, component, true) end)
+    pcall(function() item.parent_bind = name(component.parentTransform.bindName) end)
+    pcall(function() item.control_bind = name(component.controlBinding.bindName) end)
+    pcall(function()
+        local transform = component.localTransform
+        local position, orientation = transform.Position, transform.Orientation
+        local value = {
+            position = {x = tonumber(position.x.Bits), y = tonumber(position.y.Bits), z = tonumber(position.z.Bits)},
+            orientation = {i = tonumber(orientation.i), j = tonumber(orientation.j), k = tonumber(orientation.k), r = tonumber(orientation.r)}
+        }
+        for _, key in ipairs({'x', 'y', 'z'}) do if value.position[key] == nil then return end end
+        for _, key in ipairs({'i', 'j', 'k', 'r'}) do if value.orientation[key] == nil then return end end
+        item.local_transform = value
+    end)
+    return item
+end
+
 local function writeSnapshot(entity, source)
     if not defined(entity) then return end
     local ok, components = pcall(function() return entity:GetComponents() end)
@@ -80,8 +120,14 @@ local function writeSnapshot(entity, source)
     local result = {
         version = 2, collector_version = VERSION, collector = 'codeware',
         session_id = session, source = source, captured_at = os.time(),
-        path_strategy = 'typed-resource-ref-or-hash', components = {}, skipped_errors = 0
+        path_strategy = 'typed-resource-ref-or-hash', components = {}, animation_components = {}, skipped_errors = 0
     }
+    -- Engine hint is only a fallback for fully anonymous custom body assets;
+    -- known torso/arm bindings remain authoritative in the editor.
+    pcall(function()
+        local gender = name(entity:GetResolvedGenderName()):lower()
+        if gender == 'male' or gender == 'female' then result.body_gender_hint = gender end
+    end)
     for _, component in ipairs(components) do
         local success, item = pcall(readComponent, entity, component)
         if success and item then
@@ -89,6 +135,8 @@ local function writeSnapshot(entity, source)
         elseif not success then
             result.skipped_errors = result.skipped_errors + 1
         end
+        local rigOk, rig = pcall(readAnimation, entity, component)
+        if rigOk and rig then table.insert(result.animation_components, rig) end
     end
     if #result.components == 0 then
         status(source, false, 'No mesh components captured; the previous snapshot was preserved.')

@@ -1,6 +1,6 @@
 {
-  "release_sha256": "16e54bc53006c38bc5a9b5a196dc049be8ce2c6f0bc8f30231456e7c68dd9438",
-  "scope": "All files beginning with the Windows MZ executable header in the matching release; binaries are not uploaded here.",
+  "release_sha256": "b3b090532721b7a3b8b7762bfad79cf4d8247bc0a7850124d299f3bee125ce15",
+  "scope": "All MZ-header executable files in the matching ZIP; listed for review, not included as repository binaries.",
   "files": [
     {
       "path": "tools/tatto studio/runtime/python/DLLs/_asyncio.pyd",

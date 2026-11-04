@@ -29,3 +29,23 @@ public func TattoStudioGetComponentResource(component: ref<IComponent>) -> ref<T
   result.hash = ResourceAsyncRef.GetHash(reference);
   return result;
 }
+
+// AnimatedComponent uses synchronous rRef fields. Preserve their native
+// script_ref<ResourceRef> type instead of relying on Lua's raw wrapper.
+@addMethod(Entity)
+public func TattoStudioGetAnimationResource(component: ref<IComponent>, graph: Bool) -> ref<TattoStudioSnapshotResource> {
+  let animated = component as AnimatedComponent;
+  let reference: ResourceRef;
+  if !IsDefined(animated) {
+    return null;
+  };
+  if graph {
+    reference = animated.graph;
+  } else {
+    reference = animated.rig;
+  };
+  let result = new TattoStudioSnapshotResource();
+  result.path = ResRef.ToString(ResourceRef.GetPath(reference));
+  result.hash = ResourceRef.GetHash(reference);
+  return result;
+}

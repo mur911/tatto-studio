@@ -1,15 +1,20 @@
+import {localizeError} from './api-messages.mjs';
+import {snapshotReview,chooseOriginalModels} from './snapshot-review.mjs';
+import {savedDesignModel} from './design-model.mjs';
+import {WARP_VERSION} from './surface-warp.mjs';
 import {readPortableDesign} from './portable-design.mjs';
 import {readPreference,writePreference} from './ui-preferences.mjs';
 import {bindHoldSort} from './hold-sort.mjs';
-import {BAKE_VERSION,state,gl,$,fbos,addImage,loadImage,loadModel,project,validateProject,bakePNGs,render,changed,updateUI,status} from './app.js';
+import {renderKey,BAKE_VERSION,state,gl,$,fbos,addImage,loadImage,loadModel,project,validateProject,bakePNGs,render,changed,updateUI,status} from './app.js';
 
 import {bindInlineName} from './inline-name.mjs';
 export async function installLibrary(){
- let groups=[],groupId=null,designId=null,dirty=false,revision=0,loading=false,busy=false,saving=null;
+ let groups=[],groupId=null,designId=null,dirty=false,revision=0,loading=false,busy=false,saving=null,savedRenderKey=null,savedReuse=null,savedImages=new Map(),savedModelId=null;
  const root=$('designList'),message=$('libraryMessage');
+ const review=snapshotReview({api,model:()=>({id:savedModelId||state.model.id,group_id:groupId,design_id:designId}),adapt:action(adaptCurrent),onError:e=>tell(e.message,true)});
  const storedCollapsed=readPreference('collapsedGroups',[]),collapsed=new Set(Array.isArray(storedCollapsed)?storedCollapsed.filter(id=>typeof id==='string'):[]);
  async function api(path,payload){const r=await fetch(path,payload===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Token':state.config.token},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'操作失败');return data;}
- function tell(text,error=false){message.textContent=text;message.classList.toggle('error',error);status(text,error);}
+ function tell(text,error=false){if(error)text=localizeError(text);message.textContent=text;message.classList.toggle('error',error);status(text,error);}
  function selection(){const group=groups.find(g=>g.id===groupId);return {group,design:group?.designs.find(d=>d.id===designId)};}
  function location(){const {group,design}=selection();$('saveHint').textContent=design?(dirty?'未保存的修改 · ':'已保存于 ')+design.path:group?'当前分组：'+group.name+'。新建纹身或直接带入图片后保存。':'新建一个分组，或直接带入图片并保存。';$('openDesignFolder').disabled=!group;}
  function badge(){const {group,design}=selection(),e=$('documentState');e.textContent=dirty?'● 有未保存修改':design?(design.draft?'草稿已保存':'✓ 已保存'):'未选择纹身';e.classList.toggle('unsaved',dirty);$('newDesign').textContent=group?'在「'+group.name+'」中新建纹身':'新建纹身';const details=root.querySelector('.library-design.active small');if(details&&dirty)details.textContent='编辑中 · 有未保存修改';location();}
@@ -19,7 +24,7 @@ export async function installLibrary(){
  function unique(base,existing){let value=base,i=2;while(existing.includes(value))value=base+' '+i++;return value;}
  function redraw(){
   root.replaceChildren();const count=groups.reduce((n,g)=>n+g.designs.length,0);$('libraryCount').textContent=groups.length+'组 · '+count+'个设计';
-  $('groupSelect').replaceChildren();for(const g of groups){const option=document.createElement('option');option.value=g.id;option.textContent=g.name;$('groupSelect').append(option);}
+  $('groupSelect').replaceChildren();for(const g of groups){const option=document.createElement('option');option.value=g.id;option.textContent=g.name;option.dataset.userText='';$('groupSelect').append(option);}
   $('groupSelect').value=groupId||'';$('renameGroupName').value=selection().group?.name||'';
   if(!groups.length){const empty=document.createElement('div');empty.className='library-empty';empty.textContent='纹身库还没有分组。输入名称，点击「新建分组」。';root.append(empty);}
   const grip=label=>{const b=document.createElement('button');b.type='button';b.className='library-sort-handle';b.textContent='⠿';b.title='按住直接拖动排序';b.setAttribute('aria-label','拖动排序'+label);return b};
@@ -60,28 +65,59 @@ export async function installLibrary(){
  root.addEventListener('rename-error',e=>tell(e.detail,true));
 
  async function refresh(){groups=await api('/api/library');if(!groups.some(g=>g.id===groupId))groupId=groups[0]?.id||null;redraw();}
- function clear(){state.assetId=crypto.randomUUID();loading=true;for(const l of state.layers)gl.deleteTexture(l.texture);state.layers=[];state.selected=-1;state.bakeResolution=4096;state.handlesVisible=false;$('projectTitle').value=unique('Untitled Tattoo',selection().group?.designs.map(d=>d.title)||[]);changed();updateUI();loading=false;dirty=false;state.onDocument?.();badge();}
+ function clear(){savedModelId=null;savedRenderKey=null;savedReuse=null;savedImages.clear();state.assetId=crypto.randomUUID();loading=true;for(const l of state.layers)gl.deleteTexture(l.texture);state.layers=[];state.selected=-1;state.bakeResolution=4096;state.handlesVisible=false;$('projectTitle').value=unique('Untitled Tattoo',selection().group?.designs.map(d=>d.title)||[]);changed();updateUI();loading=false;dirty=false;state.onDocument?.();badge();}
  async function open(id,modelOverride=null){
-  const p=await api('/api/library/load',{group_id:groupId,design_id:id});validateProject(p);state.assetId=p.assetId||'library:'+groupId+':'+id;const target=modelOverride||state.model;loading=true;
+  const p=await api('/api/library/load',{group_id:groupId,design_id:id});validateProject(p);state.assetId=p.assetId||'library:'+groupId+':'+id;const target=modelOverride||savedDesignModel(p,state.model);loading=true;
   try{
-   const expected=target.id||'rb';if(expected!==state.model.id){const url=expected==='rb'?'/assets/model.json':target.url;if(expected!=='rb'&&!url?.startsWith('/models/'))throw new Error('请先重新读取角色模型');await loadModel(url);$('modelSelect').value=expected;}
+   const expected=target.id||'rb';for(const l of state.layers)gl.deleteTexture(l.texture);state.layers=[];state.selected=-1;if(expected!==state.model.id){const url=expected==='rb'?'/assets/model.json':target.url;if(expected!=='rb'&&!url?.startsWith('/models/'))throw new Error('请先重新读取角色模型');await loadModel(url);$('modelSelect').value=expected;}
    for(const l of state.layers)gl.deleteTexture(l.texture);state.layers=[];state.selected=-1;
    state.bakeResolution=p.bakeResolution??2048;for(const l of p.layers)await addImage(l.image,l.name,l);
-   $('projectTitle').value=p.title;designId=id;state.handlesVisible=false;changed();updateUI();dirty=false;
-  }finally{loading=false;}state.onDocument?.();redraw();remember();
+   const staleWarp=p.layers.some(l=>l.placed&&l.visible!==false&&l.projection==='warp')&&(p.warpVersion??0)<WARP_VERSION;
+   const stale=staleWarp||(p.model?.id||'rb')!==state.model.id||p.bakeVersion!==BAKE_VERSION;
+   $('projectTitle').value=p.title;designId=id;savedModelId=p.model?.id||'rb';savedRenderKey=stale?null:renderKey();savedReuse=stale?null:p.atlas_cache||null;savedImages=new Map(p.layers.map((l,i)=>[l.image,p.image_refs?.[i]]).filter(([,id])=>id));state.handlesVisible=false;changed();updateUI();dirty=stale;if(stale)revision++;
+  }finally{loading=false;}state.onDocument?.();redraw();remember();await review.refresh();
+ }
+ async function adaptCurrent(){
+  if(state.exporting||state.previewLoading)return;
+  await preserve();
+  if(!designId||!state.layers.length)throw new Error('Open a saved tattoo before adapting a copy.');
+  const original={group:groupId,design:designId,model:structuredClone(state.model)};
+  await api('/api/library/backup',{group_id:groupId});
+  const main=document.querySelector('main'),header=document.querySelector('header'),wasMain=main.inert,wasHeader=header.inert;
+  state.previewLoading=true;main.inert=header.inert=true;
+  try{
+   const job=await api('/api/models/import',{});let imported;
+   while(true){await new Promise(r=>setTimeout(r,1000));const result=await api('/api/jobs/'+job.id);status(result.message);if(result.state==='error')throw new Error(result.message);if(result.state==='done'){imported=result.result;break}}
+   const rows=await api('/api/models');const select=$('modelSelect');
+   if(![...select.options].some(o=>o.value===imported.id)){const row=rows.find(r=>r.id===imported.id),option=document.createElement('option');option.value=imported.id;option.textContent=row?.name||imported.id;option.dataset.url=imported.url;select.append(option)}
+   if(imported.id===original.model.id){tell('设计资源与当前游戏快照一致。');return}
+   await api('/api/models/coverage',{id:imported.id,group_id:original.group,design_id:original.design});
+   await loadModel(imported.url);select.value=imported.id;
+   // save() already creates a new design when savedModelId differs. No images,
+   // warp pins or liquify fields are discarded or rewritten on the old design.
+   changed();updateUI();await save(true);await review.refresh();
+  }catch(error){
+   // Failed import/bake leaves the original saved design available and selected.
+   groupId=original.group;await open(original.design);throw error;
+  }finally{state.previewLoading=false;main.inert=wasMain;header.inert=wasHeader}
  }
  async function ensureGroup(){if(groupId)return;const title=$('newGroupName').value.trim()||unique('My Tattoos',groups.map(g=>g.name));const g=await api('/api/library/group',{name:title});groupId=g.id;await refresh();}
  async function save(requireInk=false){
+  if(!dirty&&designId&&!requireInk)return selection().design;
   if(saving)return saving;
   const main=document.querySelector('main'),focused=document.activeElement,wasInert=main.inert;main.inert=true;main.setAttribute('aria-busy','true');document.body.classList.add('saving');
   saving=(async()=>{
    await ensureGroup();$('documentState').textContent='正在保存…';status('正在烘焙并写入纹身库…');await new Promise(requestAnimationFrame);const version=revision,p=structuredClone(project());if(!p.title.trim())p.title=unique('Untitled Tattoo',selection().group?.designs.map(d=>d.title)||[]);
    if(p.layers.some(l=>l.visible!==false&&l.projection==='uv'&&!fbos[l.uvAtlas]))throw new Error('此设计的UV区域不在当前模型中');
    let atlases;
-   if(state.layers.some(l=>l.placed)){atlases=await bakePNGs(state.bakeResolution,(done,total)=>status('正在保存纹理 '+done+' / '+total+'…'));}
-   const result=await api('/api/library/save',{group_id:groupId,design_id:designId,title:p.title,project:p,atlases,require_ink:requireInk===true});designId=result.id;dirty=revision!==version;await refresh();remember();badge();
-   tell(result.draft?'草稿已保存到左侧纹身库；放好图案后再保存，即可加入游戏。':'设计已保存：'+result.title+'。左侧可重新打开，更新游戏时才会构建模组。');document.dispatchEvent(new CustomEvent('tattoo:design-saved'));return result;
-  })();try{return await saving;}finally{saving=null;main.inert=wasInert;if(!wasInert)main.removeAttribute('aria-busy');document.body.classList.remove('saving');badge();if(!wasInert&&focused?.isConnected)focused.focus({preventScroll:true});}
+   const modelCopy=!!(designId&&savedModelId&&savedModelId!==(p.model?.id||'rb'));
+   const key=renderKey(p),reuse=!modelCopy&&key===savedRenderKey&&Object.keys(savedReuse?.files||{}).length?savedReuse:null;
+   if(state.layers.some(l=>l.placed)&&!reuse){atlases=await bakePNGs(state.bakeResolution,(done,total)=>status('正在保存纹理 '+done+' / '+total+'…'));}
+   if(modelCopy)p.title=unique(p.title,selection().group?.designs.map(d=>d.title)||[]);
+   const wireProject={...p,layers:p.layers.map(layer=>{const ref=!modelCopy&&savedImages.get(layer.image);if(!ref)return layer;const {image,...rest}=layer;return {...rest,image_ref:ref}})};
+   const result=await api('/api/library/save',{group_id:groupId,design_id:modelCopy?null:designId,title:p.title,project:wireProject,atlases,reuse,require_ink:requireInk===true});designId=result.id;if(modelCopy)$('projectTitle').value=result.title;savedModelId=p.model?.id||'rb';savedRenderKey=key;savedReuse=result.cache_token;savedImages=new Map(p.layers.map((l,i)=>[l.image,result.image_refs?.[i]]).filter(([,id])=>id));dirty=revision!==version;await refresh();remember();badge();
+   tell(modelCopy?'模型已改变，已另存副本：'+result.title+'。原设计未更改。':result.draft?'草稿已保存到左侧纹身库；放好图案后再保存，即可加入游戏。':'设计已保存：'+result.title+'。左侧可重新打开，更新游戏时才会构建模组。');document.dispatchEvent(new CustomEvent('tattoo:design-saved'));await review.refresh();return result;
+  })();try{return await saving;}finally{saving=null;main.inert=wasInert;if(!wasInert)main.removeAttribute('aria-busy');document.body.classList.remove('saving');badge();updateUI();if(!wasInert&&focused?.isConnected)focused.focus({preventScroll:true});}
  }
  async function preserve(){if(dirty&&(designId||state.layers.length))await save();}
  function action(fn){return async(...args)=>{if(busy)return;busy=true;root.classList.add('library-busy');for(const id of ['newGroup','newDesign','saveLibrary'])$(id).disabled=true;try{await fn(...args)}catch(e){tell(e.message,true)}finally{busy=false;root.classList.remove('library-busy');for(const id of ['newGroup','newDesign','saveLibrary'])$(id).disabled=false;}};}
@@ -92,9 +128,13 @@ export async function installLibrary(){
   const candidates=[];
   for(const g of groups)for(const d of g.designs){
    if(d.draft||!d.enabled)continue;const p=await api('/api/library/load',{group_id:g.id,design_id:d.id});
+   // Refresh the current captured body only. Other saved bodies (including
+   // the opposite V body) must not be silently retargeted during publication.
+   if((p.model?.id||'rb')!==target.id)continue;
    const usesSkin=p.layers.some(l=>l.blendTarget==='skin'&&l.blendMode&&l.blendMode!=='normal');
    const skinStamp=target.id+':'+(state.skinReference?.created_at??'fallback');
-   if((p.model?.id||'rb')===target.id&&p.bakeVersion===BAKE_VERSION&&(!usesSkin||p.skinStamp===skinStamp))continue;
+   const staleWarp=p.layers.some(l=>l.placed&&l.visible!==false&&l.projection==='warp')&&(p.warpVersion??0)<WARP_VERSION;
+   if((p.model?.id||'rb')===target.id&&p.bakeVersion===BAKE_VERSION&&!staleWarp&&(!usesSkin||p.skinStamp===skinStamp))continue;
    for(const l of p.layers){if(l.visible===false)continue;const key=l.projection==='uv'?l.uvAtlas:l.targetAtlas;if(key&&!fbos[key])throw new Error('「'+g.name+' / '+d.title+'」的部位 '+key+' 不在当前模型中，游戏包未更新');}
    candidates.push({groupId:g.id,...d});
   }
@@ -109,6 +149,8 @@ export async function installLibrary(){
  }
  $('newGroup').onclick=action(async()=>{const title=$('newGroupName').value.trim();if(!title)throw new Error('请先输入新分组的名称');const hadGroup=!!groupId;await preserve();if(!hadGroup&&groupId&&selection().group?.name===title){$('newGroupName').value='';tell('分组已建立在本机：'+title+'，当前设计已保存。');return;}const group=await api('/api/library/group',{name:title});groupId=group.id;designId=null;$('newGroupName').value='';await refresh();clear();remember();tell('分组已建立在本机：'+group.name+'。现在可以新建纹身。');});
  $('newGroupName').onkeydown=e=>{if(e.key==='Enter')$('newGroup').click();};
+ if(state.config.publication?.restored?.length)tell('纹身库已恢复，请在 Vortex 重新部署。');else if(state.config.publication?.error)tell(state.config.publication.error,true);
+ const paths=document.createElement('button');paths.id='pathSettings';paths.textContent='路径设置';paths.onclick=action(async()=>{if(state.exporting||state.previewLoading)return;await preserve();window.location.assign('/setup.html')});document.querySelector('header').append(paths);
  $('newDesign').onclick=action(async()=>{await preserve();await ensureGroup();designId=null;clear();const result=await api('/api/library/save',{group_id:groupId,title:$('projectTitle').value,project:project()});designId=result.id;await refresh();remember();tell('空白纹身草稿已保存。带入图片后继续编辑，再点「保存设计」。');});
  $('renameGroup').onclick=action(async()=>{if(!groupId)throw new Error('先选一个分组');await preserve();await api('/api/library/rename',{group_id:groupId,name:$('renameGroupName').value});await refresh();tell('分组已重命名；游戏名称将在更新游戏纹身库后改变。');});
  $('openLibrary').onclick=action(()=>api('/api/library/open',{}));
@@ -117,7 +159,7 @@ export async function installLibrary(){
  $('publish').onclick=action(async()=>{
   const target=structuredClone(state.model),button=$('publish'),main=document.querySelector('main'),header=document.querySelector('header');button.disabled=true;main.inert=header.inert=true;main.setAttribute('aria-busy','true');state.exporting=true;document.body.classList.add('exporting');document.dispatchEvent(new CustomEvent('tattoo:operation',{detail:{kind:'publish',phase:'start'}}));
   try{if(dirty||(!designId&&state.layers.length))await save();if(!groups.some(g=>g.designs.some(d=>!d.draft)))throw new Error('还没有可加入游戏的设计。请先把图案放到模型上并保存。');
-   const matched=await adaptPublished(target);const result=await api('/api/library/publish',{});while(true){await new Promise(r=>setTimeout(r,1000));const job=await api('/api/jobs/'+result.id);status(job.message,job.state==='error');if(job.state==='error')throw new Error(job.message);if(job.state==='done'){const e=$('publishInfo'),b=document.createElement('b'),p=document.createElement('p');b.textContent=job.result.updated_staging.length?'游戏纹身库已更新':'首次安装包已生成';p.textContent='目标模型：'+target.name+'。'+(job.result.updated_staging.length?'关闭游戏后，自行在Vortex部署并重启游戏。':'首次在Vortex安装：'+job.result.package);e.replaceChildren(b,p);tell('纹身库已按 '+target.name+' 生成；重新适配 '+matched.count+' 套，由你自行部署。');document.dispatchEvent(new CustomEvent('tattoo:operation',{detail:{kind:'publish',phase:'done'}}));break;}}}catch(error){const e=$('publishInfo'),b=document.createElement('b'),p=document.createElement('p');b.textContent='生成失败：游戏文件未更新';p.textContent=error.message;e.replaceChildren(b,p);throw error;}finally{button.disabled=false;state.exporting=false;main.inert=header.inert=false;main.removeAttribute('aria-busy');document.body.classList.remove('exporting');}
+   const matched=await adaptPublished(target);const check=await api('/api/library/preflight',{});const acknowledgment=await chooseOriginalModels(check);if(acknowledgment===false)return;const result=await api('/api/library/publish',{snapshot_acknowledgment:acknowledgment});while(true){await new Promise(r=>setTimeout(r,1000));const job=await api('/api/jobs/'+result.id);status(job.message,job.state==='error');if(job.state==='error')throw new Error(job.message);if(job.state==='done'){const e=$('publishInfo'),b=document.createElement('b'),p=document.createElement('p');b.textContent='游戏纹身库已更新';p.textContent=state.config.installation_mode==='manual'?'纹身库已写入游戏目录，请重启游戏。':'已更新当前模组内的纹身库。关闭游戏后在 Vortex 部署并重启游戏，无需另装 ZIP。';const path=document.createElement('p');path.className='path-value';path.textContent=job.result.publish_target||job.result.updated_staging?.[0]||job.result.package;e.replaceChildren(b,p,path);tell('纹身库已更新；刷新了当前模型的 '+matched.count+' 套设计，请部署。');document.dispatchEvent(new CustomEvent('tattoo:operation',{detail:{kind:'publish',phase:'done'}}));break;}}}catch(error){const e=$('publishInfo'),b=document.createElement('b'),p=document.createElement('p');b.textContent='生成失败：游戏文件未更新';p.textContent=error.message;e.replaceChildren(b,p);throw error;}finally{button.disabled=false;state.exporting=false;main.inert=header.inert=false;main.removeAttribute('aria-busy');document.body.classList.remove('exporting');}
  });
  window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();$('saveLibrary').click();}});
  $('libraryPath').textContent=state.config.library_path||'';

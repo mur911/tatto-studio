@@ -7,6 +7,7 @@ import {installDesignExport} from './design-export.mjs';
 import {modelResourceMessages} from './resource-info.mjs';
 import {installSkinCalibration} from './skin-calibration-ui.mjs';
 import {readPreference,writePreference} from './ui-preferences.mjs';
+import {frameTask} from './frame-work.mjs';
 import {state,gl,fbos,$,canvas,add,sub,mul,dot,unit,cameraBasis,render,bake,changed,resize,loadModel,refreshSkin,addImage,project,validateProject,updateUI,status,ensureTPose,applyPreviewPose,pick,atlasPNG,atlasCanvas as readAtlasCanvas,setLayerBlur,ready} from './app.js';
 await ready;
 import {editPoseLayer} from './pose-edit.mjs';
@@ -15,6 +16,7 @@ import {installLibrary} from './library-ui.mjs';
 import {installPlacement} from './placement.mjs';
 import {installUndo} from './undo-ui.mjs';
 import {frameToEuler,eulerToFrame,clamp,uprightFrame,projectionRadius} from './transform-math.mjs';
+let uvBakeTimer;
 let folders=[],groupId=null,designId=null,uvZoom=1,uvPan=[0,0],uvCache={},uvPaths={},pointerUV=null;
 let lastSelectedLayer=null;
 const uv=$('uvCanvas'),ctx=uv.getContext('2d');
@@ -33,7 +35,7 @@ function extraUI(){
  $('bakeResolution').value=String(state.bakeResolution);const l=selected();if(l!==lastSelectedLayer){if(l?.projection==='uv'&&fbos[l.uvAtlas])$('uvAtlas').value=l.uvAtlas;lastSelectedLayer=l;}const isUV=l?.projection==='uv',isWarp=l?.projection==='warp',round=['cylindrical','spherical'].includes(l?.projection);$('surfaceControls').hidden=isUV||!state.handlesVisible;$('surfaceSizes').hidden=isUV;$('uvControls').hidden=!isUV||!state.handlesVisible;$('roundControls').hidden=!round;$('sphereControl').hidden=l?.projection!=='spherical';$('cylinderTextureControls').hidden=!round;$('fitCylinder').hidden=l?.projection!=='cylindrical';$('metricProjection').closest('label').hidden=l?.projection!=='cylindrical';$('backfaceControl').hidden=isUV||isWarp;$('depthNumber').closest('label').hidden=isWarp;$('depthNumber').closest('label').nextElementSibling.hidden=isWarp;$('widthControl').hidden=round;$('fitPlane').hidden=round;$('heightControl').hidden=l?.projection==='spherical';$('targetAtlas').disabled=isUV;
  if(l){$('surfaceFollow').checked=l.surfaceFollow===true;for(const [i,id]of ['projectionScaleX','projectionScaleY','projectionScaleZ'].entries())if(document.activeElement!==$(id))$(id).value=Number(((l.projectionScale?.[i]??1)*100).toFixed(3));$('backfaceCulling').checked=l.backfaceCulling??((l.projection||'surface')==='surface');$('radiusOut').textContent=Number((l.radius??5).toFixed(2))+' cm';$('wrapAngleOut').textContent=Number((l.wrapAngle??360).toFixed(1))+'°';$('sphereAngleOut').textContent=Number((l.sphereAngle??180).toFixed(1))+'°';for(const [index,id]of ['cylinderScaleX','cylinderScaleY'].entries())if(document.activeElement!==$(id))$(id).value=Number(((l[l.projection==='spherical'?'sphereScale':'cylinderScale']?.[index]??1)*100).toFixed(3));$('layerBlur').value=l.blur||0;$('blurOut').textContent=(l.blur||0)+' px';$('blendTarget').value=l.blendTarget||'layers';$('layerBlend').value=l.blendMode||'normal';$('removeWhite').checked=!!l.removeWhite;$('projection').value=l.projection||'surface';for(const [i,key]of ['posX','posY','posZ'].entries())$(key).value=(editable().center[i]*100).toFixed(2);$('uvU').value=(l.uvCenter?.[0]??.5).toFixed(4);$('uvV').value=(l.uvCenter?.[1]??.5).toFixed(4);$('uvWidth').value=((l.uvSize?.[0]??.12)*100).toFixed(2);$('uvHeight').value=((l.uvSize?.[1]??.12)*100).toFixed(2);$('uvAngle').value=l.angle??0;if(document.activeElement!==$('depthNumber'))$('depthNumber').value=Number(l.depth.toFixed(3));$('metricProjection').checked=!!l.metricProjection}
  if(l){const rotation=frameToEuler(editable());for(const [i,key]of ['rotX','rotY','rotZ'].entries())if(document.activeElement!==$(key))$(key).value=rotation[i].toFixed(1);$('mappingHelp').textContent=mappingHints[l.projection||'surface'];$('targetAtlas').value=l.targetAtlas||'';for(const [key,def]of [['radius',5],['wrapAngle',360],['sphereAngle',180]])if(document.activeElement!==$(key))$(key).value=l[key]??def;$('wrapMode').value=l.wrapMode||'clip';$('repeatX').value=l.repeat?.[0]??1;$('repeatY').value=l.repeat?.[1]??1;}
- liquify.refresh();drawGizmo();surfaceWarp.draw();drawUV();
+ liquify.refresh();drawUV();render();
 }
 state.onUI=extraUI;state.onRender=()=>{drawGizmo();surfaceWarp.draw()};state.onBake=()=>{uvCache={};drawUV()};
 let blurTimer;
@@ -89,6 +91,8 @@ function atlasCanvas(key){if(uvCache[key])return uvCache[key];const f=fbos[key];
 function uvPath(key){if(uvPaths[key])return uvPaths[key];const p=new Path2D(),edges=new Set();let count=0;for(const part of state.parts){if(part.atlas!==key)continue;const v=part.vertices,t=part.indices;const step=Math.max(1,Math.ceil(t.length/3/10000))*3;for(let j=0;j<t.length;j+=step){for(let k=0;k<3;k++){const a=t[j+k]*8,b=t[j+(k+1)%3]*8,x=v[a+6],y=1-v[a+7],u=v[b+6],w=1-v[b+7];const id=[x,y,u,w].map(n=>n.toFixed(4)).join(',');if(edges.has(id))continue;edges.add(id);p.moveTo(x,y);p.lineTo(u,w);count++}}}return uvPaths[key]=p}
 function uvTransform(){const base=Math.min(uv.width,uv.height)*.9;return {scale:base*uvZoom,x:(uv.width-base)/2+uvPan[0],y:(uv.height-base)/2+uvPan[1]}}
 function drawUV(){
+ clearTimeout(uvBakeTimer);if($('uvBody').hidden||state.exporting||document.querySelector('main').inert)return;
+ if(!$('uvBody').hidden&&state.dirty&&!state.externalDragging&&!document.body.classList.contains('saving'))uvBakeTimer=setTimeout(()=>{if(!state.externalDragging&&state.dirty)bake(2048,$('uvAtlas').value)},220);
  if(!ctx||!$('uvAtlas').value)return;const key=$('uvAtlas').value,t=uvTransform();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#080f17';ctx.fillRect(0,0,uv.width,uv.height);ctx.translate(t.x,t.y);ctx.scale(t.scale,t.scale);ctx.fillStyle='#1b2a37';ctx.fillRect(0,0,1,1);const image=atlasCanvas(key);if(image)ctx.drawImage(image,0,0,1,1);
  if($('uvWire').checked){ctx.strokeStyle='#72b2c16b';ctx.lineWidth=.55/t.scale;ctx.stroke(uvPath(key))}
  const l=selected();if(l?.placed&&l.projection==='uv'&&l.uvAtlas===key&&state.handlesVisible){ctx.save();ctx.translate(l.uvCenter[0],1-l.uvCenter[1]);ctx.rotate(-l.angle*Math.PI/180);ctx.strokeStyle='#6dc2d2';ctx.lineWidth=1.7/t.scale;ctx.setLineDash([7/t.scale,4/t.scale]);ctx.strokeRect(-l.uvSize[0]/2,-l.uvSize[1]/2,...l.uvSize);ctx.restore()}
@@ -123,7 +127,7 @@ viewport.onpointerdown=e=>{
   updateUI();
  }
 };
-viewport.onpointermove=e=>{
+const moveUV=frameTask(e=>{
  if(!pointerUV)return;const l=selected(),a=pointerUV;
  if(a.button===2){const r=uv.getBoundingClientRect();uvPan=[a.pan[0]+(e.clientX-a.x)*uv.width/r.width,a.pan[1]+(e.clientY-a.y)*uv.height/r.height];drawUV();return}
  if(!l||state.exporting)return;const point=mouseUV(e),dx=point[0]-a.point[0],dy=point[1]-a.point[1];
@@ -131,8 +135,9 @@ viewport.onpointermove=e=>{
  else if(a.mode==='rotate'){const start=Math.atan2(a.point[1]-a.center[1],a.point[0]-a.center[0]),end=Math.atan2(point[1]-a.center[1],point[0]-a.center[0]);let angle=a.angle+(end-start)*180/Math.PI;if(e.shiftKey)angle=Math.round(angle/15)*15;l.angle=((angle+180)%360+360)%360-180;l.surfaceFollow=false;}
  else{const angle=a.angle*Math.PI/180,sx=e.clientX-a.x,sy=e.clientY-a.y,distance=a.axis==='v'?-sx*Math.sin(angle)-sy*Math.cos(angle):a.axis==='u'?sx*Math.cos(angle)-sy*Math.sin(angle):-sy,ratio=Math.exp(Math.max(-7,Math.min(7,distance*.012)));l.uvSize=a.size.map((v,i)=>clamp(v*(e.shiftKey||a.axis==='all'||a.axis===(i===0?'u':'v')?ratio:1),.001,2));}
  changed();updateUI();
-};
-viewport.onpointerup=()=>{pointerUV=null};viewport.onpointercancel=()=>{pointerUV=null};
+});
+viewport.onpointermove=e=>moveUV(e);
+viewport.onpointerup=()=>{moveUV.flush();pointerUV=null};viewport.onpointercancel=()=>{moveUV.cancel();pointerUV=null};
 function zoomUV(value,anchor){const r=uv.getBoundingClientRect(),e=anchor||{clientX:r.left+r.width/2,clientY:r.top+r.height/2},before=mouseUV(e);uvZoom=Math.max(.01,Math.min(1e5,value));const after=mouseUV(e),t=uvTransform();uvPan[0]+=(after[0]-before[0])*t.scale;uvPan[1]-=(after[1]-before[1])*t.scale;drawUV()}
 viewport.addEventListener('wheel',e=>{e.preventDefault();zoomUV(uvZoom*Math.exp(-e.deltaY*.001),e)},{passive:false});
 $('uvZoomIn').onclick=()=>zoomUV(uvZoom*1.25);$('uvZoomOut').onclick=()=>zoomUV(uvZoom/1.25);$('uvZoomValue').oninput=()=>zoomUV(Number($('uvZoomValue').value)/100||1);
@@ -162,15 +167,15 @@ $('readCharacter').onclick=guarded(async()=>{
    if(value.state==='done'){
     operation('progress','正在载入角色预览…');await refreshModels();$('modelSelect').value=value.result.id;
     await loadModel(value.result.url);writePreference('previewModel',state.model.id);updateUI();
-    status('新快照已用于预览，纹身库未修改。点击「更新游戏纹身库」后，全部已勾选纹身会匹配此模型。');
+    status('快照已切换。改用其他模型后保存会另存副本，其他设计保持原模型。');
     operation('done');break;
    }
   }
  }catch(error){operation('error',error.message);throw error}
  finally{previewBusy(false)}
 });
-async function refreshModels(){const models=await api('/api/models');$('modelSelect').replaceChildren();for(const m of [{id:'setup',name:'Read a character snapshot',url:'/assets/model.json'},...models]){const o=document.createElement('option');o.value=m.id;o.textContent=m.name;o.dataset.url=m.url;$('modelSelect').append(o)}$('modelSelect').value=state.model.id}
-$('modelSelect').onchange=guarded(async()=>{if(state.exporting||state.previewLoading)return;const option=$('modelSelect').selectedOptions[0];previewBusy(true);try{await loadModel(option.dataset.url);writePreference('previewModel',state.model.id);updateUI();status('已切换预览快照，纹身库未修改。点击「更新游戏纹身库」后，全部已勾选纹身会匹配此模型。');}finally{previewBusy(false)}});
+async function refreshModels(){const models=await api('/api/models');$('modelSelect').replaceChildren();for(const m of [{id:'setup',name:'Read a character snapshot',url:'/assets/model.json'},...models]){const o=document.createElement('option');o.value=m.id;o.textContent=m.name;if(m.id!=='setup'&&!/^游戏角色资源 \/ /.test(m.name))o.dataset.userText='';o.dataset.url=m.url;$('modelSelect').append(o)}$('modelSelect').value=state.model.id}
+$('modelSelect').onchange=guarded(async()=>{if(state.exporting||state.previewLoading)return;const option=$('modelSelect').selectedOptions[0];previewBusy(true);try{await loadModel(option.dataset.url);writePreference('previewModel',state.model.id);updateUI();status('快照已切换。改用其他模型后保存会另存副本，其他设计保持原模型。');}finally{previewBusy(false)}});
 await refreshModels();
 const previousModel=readPreference('previewModel'),availableModels=Array.from($('modelSelect').options);
 const initialModel=availableModels.find(option=>option.value===previousModel)||(!state.layers.length&&availableModels.length>1?availableModels[availableModels.length-1]:null);
@@ -179,4 +184,5 @@ const libraryUI=await installLibrary();
 installDesignExport(libraryUI);
 installUndo();
 refreshModelUI();extraUI();
+state.editorReady=true;
 

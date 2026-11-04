@@ -5,9 +5,26 @@ an independent texture. Its UVs overlap the shoulder skin. It must remain in
 the character preview, but must not write into the skin tattoo atlas.
 """
 import json
+import re
 
 VERSION = 1
 MIN_BAKE_VERSION = 13
+
+
+def cyberware_skin_candidate(component):
+    """Only inspected holstered arm shells, never blades/devices/decals."""
+    path=(component.get('path') or '').replace('/', '\\').lower()
+    return bool(re.search(r'\\cyberware\\player\\a0_003__mantisblade\\entities\\meshes\\a0_003_(?:ma|wa)__mantisblade_holstered_(?:upperarm_)?(?:left|right)\.mesh$',path))
+
+
+def cyberware_skin_mask(doc, appearance, mask):
+    selected=next((a['Data'] for a in doc['Data']['RootChunk'].get('appearances',[]) if a['Data']['name']['$value']==appearance),None)
+    if selected is None:return 0
+    allowed=0
+    for index,material in enumerate(selected['chunkMaterials']):
+        name=material['$value'].lower()
+        if re.fullmatch(r'(?:skin_forearm_\d+|(?:(?:forearm|arm)_)?\d{2}_(?:ca|bl)_[a-z0-9_]+)',name):allowed|=1<<index
+    return mask & allowed
 
 
 def excluded_chunks(doc, appearance):

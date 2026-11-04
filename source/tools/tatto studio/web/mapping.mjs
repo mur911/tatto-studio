@@ -1,6 +1,7 @@
 // Local projection coordinates are shared by preview and UV baking.
 export const projectionModes={surface:0,uv:1,cylindrical:2,spherical:3,triplanar:4,warp:5};
 export function projectionGLSL(antialias=false){return `
+uniform float warpSurfaceValid;
 vec2 spinUV(vec2 q,vec2 cs){q-=0.5;return vec2(q.x*cs.x+q.y*cs.y,-q.x*cs.y+q.y*cs.x)+0.5;}
 vec4 readStamp(sampler2D tex,vec2 q,vec2 repeatCount,float wrapMode){
  q=(q-0.5)*repeatCount+0.5;
@@ -36,7 +37,7 @@ if(settings${i}.w>0.5&&(scopeAtlas${i}<-.5||abs(currentAtlas-scopeAtlas${i})<.1)
   vec3 chartCross=cross(dFdx(chartPosition),dFdy(chartPosition));
   vec2 chartX=dFdx(vWarpUV.xy),chartY=dFdy(vWarpUV.xy);
   float chartFacing=(chartX.x*chartY.y-chartX.y*chartY.x)*dot(chartCross,n);`:''}
-  if(vWarpUV.z>.999${derivatives?'&&chartFacing>0.0':''}){
+  if(warpSurfaceValid>.5&&vWarpUV.z>.999${derivatives?'&&chartFacing>0.0':''}){
    vec2 q=liquifyPoint(vec3(vWarpUV.xy,0.0),vec3(dot(n,right${i}),dot(n,up${i}),dot(n,normal${i})),${i}.0,liquifyCounts[${i}]).xy;
    t=sampleStamp(image${i},q,repeatCount${i},wrapMode${i});}
  }else if(mode>.5&&mode<1.5){

@@ -1,7 +1,7 @@
 // Extend baked RGBA only outside actual UV islands. Filtering/mipmaps can then
 // sample across a resource seam without picking up a transparent atlas border.
 // Transparent artwork inside an island is deliberately left unchanged.
-let cachedCoverage=null;
+let coverageParts=null;const coverage=new Map();let coverageBytes=0;const COVERAGE_LIMIT=48*1024*1024;
 export const seamPaddingPixels=size=>Math.max(2,Math.ceil(size/512));
 export function rasterizeUVMask(parts,atlas,width,height=width){
  const mask=new Uint8Array(width*height);
@@ -43,6 +43,8 @@ export function extendUVGutter(pixels,mask,width,height,radius){
 }
 export function padAtlasPixels(pixels,size,parts,atlas){
  let ink=false;for(let i=3;i<pixels.length;i+=4)if(pixels[i]){ink=true;break}if(!ink)return 0;
- if(!cachedCoverage||cachedCoverage.parts!==parts||cachedCoverage.atlas!==atlas||cachedCoverage.size!==size)cachedCoverage={parts,atlas,size,mask:rasterizeUVMask(parts,atlas,size)};
- return extendUVGutter(pixels,cachedCoverage.mask,size,size,seamPaddingPixels(size));
+ if(coverageParts!==parts){coverageParts=parts;coverage.clear();coverageBytes=0}
+ const key=atlas+':'+size;let mask=coverage.get(key);
+ if(!mask){mask=rasterizeUVMask(parts,atlas,size);while(coverageBytes+mask.byteLength>COVERAGE_LIMIT&&coverage.size){const oldest=coverage.keys().next().value;coverageBytes-=coverage.get(oldest).byteLength;coverage.delete(oldest)}coverage.set(key,mask);coverageBytes+=mask.byteLength}else{coverage.delete(key);coverage.set(key,mask)}
+ return extendUVGutter(pixels,mask,size,size,seamPaddingPixels(size));
 }

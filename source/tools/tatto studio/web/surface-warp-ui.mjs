@@ -1,3 +1,4 @@
+import {framePointer} from './frame-work.mjs';
 import {state,$,canvas,pick,cameraBasis,sub,changed,updateUI,status} from './app.js';
 import {defaultWarpPoints,prepareWarp,expandWarpToHit,moveWarpPoint,warpHit,warpSurfacePoint,warpControlPoint,rememberWarpPin} from './surface-warp.mjs';
 import {surfacePointVisible} from './surface-visibility.mjs';
@@ -29,13 +30,13 @@ export function installSurfaceWarp({screen}){
   e.preventDefault();e.stopPropagation();e.currentTarget.setPointerCapture(e.pointerId);drag={index:Number(index),layer,id:e.pointerId,offset:fromList?[0,0]:[e.clientX-rect.left-pin.x,e.clientY-rect.top-pin.y]};state.externalDragging=true;state.warpEditing=true;state.handlesVisible=true;
  }
  overlay.addEventListener('pointerdown',e=>startDrag(e));pinList.addEventListener('pointerdown',e=>startDrag(e,true));
- window.addEventListener('pointermove',e=>{
+ framePointer(window,e=>{
   if(!drag||e.pointerId!==drag.id)return;e.preventDefault();const x=e.clientX-drag.offset[0],y=e.clientY-drag.offset[1],rect=canvas.getBoundingClientRect();if(x<rect.left||x>rect.right||y<rect.top||y>rect.bottom)return;
   const hit=pick(x,y);if(!hit||!expandWarpToHit(drag.layer,state.parts,hit))return;
   const q=warpHit(drag.layer,hit,true);if(!q)return;const points=moveWarpPoint(drag.layer.warp?.points||defaultWarpPoints(),drag.index,q);if(!points)return;
   drag.layer.warp={...drag.layer.warp,version:1,points};rememberWarpPin(drag.layer,drag.index,hit);changed();updateUI();
  });
- const end=e=>{if(!drag||e.pointerId!==drag.id)return;drag=null;state.externalDragging=false;status('贴合点已更新。保存设计后会保留，并用于游戏纹身输出。')};
+ const end=e=>{if(!drag||e.pointerId!==drag.id)return;drag=null;state.externalDragging=false;updateUI();status('贴合点已更新。保存设计后会保留，并用于游戏纹身输出。')};
  window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);
  document.addEventListener('tattoo:transform-tool',()=>{state.warpEditing=false;draw()});return {draw};
 }

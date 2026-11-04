@@ -1,3 +1,4 @@
+import processes
 """Read deployed mesh references from a CET snapshot; import resource rest meshes.
 
 This deliberately labels imported geometry preview-only: resource geometry is
@@ -6,6 +7,9 @@ not the renderer's deformed skin, and an arbitrary body needs its own overlay.
 import base64,hashlib,json,mmap,pathlib,re,struct,subprocess,time
 import numpy as np
 import settings
+import body_profile
+import captured_rigs
+import tattoo_regions
 from archive_order import ordered_mods
 ROOT=pathlib.Path(__file__).parent.resolve();MODELS=settings.DATA_ROOT/'models';MODELS.mkdir(exist_ok=True)
 GAME=settings.GAME
@@ -14,7 +18,7 @@ CLI=settings.CLI
 def listed():
     result=[]
     for p in MODELS.glob('*/model.json'):
-        d=json.loads(p.read_text(encoding='utf-8'));result.append({'id':d['id'],'name':d['body'],'url':'/models/'+d['id']+'/model.json','captured_at':d.get('captured_at',0)})
+        d=json.loads(p.read_text(encoding='utf-8'));result.append({'id':d['id'],'name':d['body'],'body_gender':d.get('body_gender'),'url':'/models/'+d['id']+'/model.json','captured_at':d.get('captured_at',0)})
     return sorted(result,key=lambda item:item['captured_at'] or 0)
 
 def select_snapshot(folder):
@@ -75,7 +79,8 @@ def kind(component):
     n=(component.get('name') or '').lower();path=(component.get('path') or '').lower()
     if 'shadow' in n or '_fpp' in n and 'neck' not in n or 'tatto_studio_' in n:return None
     if any(t in n for t in ('nails','makeup','eyelash','eyebrow','teeth','tongue')):return None
-    if any(t in path for t in ('\\nails\\','_makeup_', '\\ht_', '\\he_', '\\heb_', '\\hx_', '\\hair\\','\\cyberware\\')):return None
+    if any(t in path for t in ('\\nails\\','_makeup_', '\\ht_', '\\he_', '\\heb_', '\\hx_', '\\hair\\')):return None
+    if '\\cyberware\\' in path and not tattoo_regions.cyberware_skin_candidate(component):return None
     if '\\h0_' in path:return 'head'
     if n.startswith(('i0_','genital')) or any(x in path for x in ('genitals','penis','vagina')):return 'genitals'
     if n.startswith('h0_') or 'basehead' in n and not n.startswith(('ht_','hb_','heb_','hx_')):return 'head'
@@ -115,7 +120,7 @@ def geometry(doc,mask=None):
     return struct.pack('<II',len(v),len(t))+v.tobytes()+t.tobytes(),len(v),len(t)//3
 
 def import_current(progress=lambda _:None):
-    snap,path=snapshot();merged={}
+    snap,path=snapshot();merged={};context=captured_rigs.snapshot_context(snap)
     for c in snap.get('components',[]):
         region=kind(c)
         if not region or c.get('enabled') is False:continue
@@ -129,12 +134,26 @@ def import_current(progress=lambda _:None):
     items=list(merged.values())
     if not items:raise ValueError('快照中没有可读取的身体组件，请在义体医生编辑外貌时重新采集')
     progress('读取实际部署的资源索引…');indices=[];wanted={item['hash'] for item in items}
+    rig_hashes=set()
+    for entry in context['animation_components']:
+        for key in ('rig','graph'):
+            depot=captured_rigs.reference(entry.get(key,{}))['DepotPath']
+            h=fnv(depot['$value']) if depot['$storage']=='string' else int(depot['$value'])
+            if h:rig_hashes.add(h)
+    wanted.update(rig_hashes)
     mod=ordered_mods(GAME)
     base=sorted((GAME/'archive/pc/ep1').glob('*.archive'))+sorted((GAME/'archive/pc/content').glob('*.archive'))
     for archive in mod+base:
         try:indices.append((archive,archive_hashes(archive,wanted),archive in mod))
         except (OSError,ValueError):continue
-    signature={'importer_version':2,'components':sorted([item['component'] for item in items],key=lambda c:(c.get('name',''),c.get('path',''))),'archives':[(str(a),a.stat().st_size,a.stat().st_mtime_ns) for a,hashes,_ in indices if hashes]}
+    if rig_hashes:
+        origins=set()
+        for h in rig_hashes:
+            origin=next((a for a,hashes,_ in indices if h in hashes),None)
+            if origin is not None:origins.add(str(origin))
+        context['resource_archives']=sorted(origins)
+        context['resource_archive_stamps']={p:{'size':pathlib.Path(p).stat().st_size,'mtime_ns':pathlib.Path(p).stat().st_mtime_ns} for p in sorted(origins)}
+    signature={'importer_version':5,'components':sorted([item['component'] for item in items],key=lambda c:(c.get('name',''),c.get('path',''))),'context':context,'archives':[(str(a),a.stat().st_size,a.stat().st_mtime_ns) for a,hashes,_ in indices if hashes]}
     ident='character-'+hashlib.sha256(json.dumps(signature,sort_keys=True).encode()).hexdigest()[:12]
     folder=MODELS/ident;folder.mkdir(exist_ok=True);log=folder/'import.log'
     parts=[];issues=[];sources=[];batches={};resolutions=[]
@@ -147,7 +166,7 @@ def import_current(progress=lambda _:None):
         if archive is None:issues.append(c['name']+'：找不到部署资源');continue
         batches.setdefault(archive,[]).append(item)
     def run(args):
-        p=subprocess.run([str(CLI)]+list(map(str,args)),capture_output=True,text=True,encoding="utf-8",errors="replace",timeout=240)
+        p=processes.run([str(CLI)]+list(map(str,args)),capture_output=True,text=True,encoding="utf-8",errors="replace",timeout=240)
         with log.open('a',encoding='utf-8') as f:f.write(p.stdout+p.stderr+'\n')
         if p.returncode or re.search(r'\bError\b',p.stdout):raise RuntimeError('模型资源转换失败，请查看 '+str(log))
     for index,(archive,records) in enumerate(batches.items()):
@@ -178,13 +197,25 @@ def import_current(progress=lambda _:None):
                 if file is None:raise ValueError('未找到提取的网格')
                 jp=jsonfiles.get(file.name+'.json')
                 if jp is None:raise ValueError('网格转换未产生 JSON')
-                doc=json.loads(jp.read_text(encoding='utf-8-sig'));binary,n,tri=geometry(doc,item['mask'])
+                doc=json.loads(jp.read_text(encoding='utf-8-sig'))
+                if tattoo_regions.cyberware_skin_candidate(c):
+                    item['mask']=tattoo_regions.cyberware_skin_mask(doc,c.get('appearance'),item['mask'])
+                    if not item['mask']:continue
+                binary,n,tri=geometry(doc,item['mask'])
                 filename='part-'+str(len(parts))+'.bin';(folder/filename).write_bytes(binary)
                 atlas=region if not any(p['atlas']==region for p in parts) else region+'_'+str(len(parts))
                 parts.append({'name':c['name'],'label':c['name'],'atlas':atlas,'url':'/models/'+ident+'/'+filename,'vertices':n,'triangles':tri,'source_resource':c.get('path'),'source_archive':archive.name})
-                sources.append({'component':c,'archive':str(archive),'mesh_json':str(jp),'cooked':str(file),'atlas':atlas,'mask':str(item['mask'])})
+                sources.append({'component':c,'archive':str(archive),'archive_stamp':{'size':archive.stat().st_size,'mtime_ns':archive.stat().st_mtime_ns},'mesh_json':str(jp),'cooked':str(file),'atlas':atlas,'mask':str(item['mask'])})
             except Exception as e:issues.append(c['name']+'：'+str(e))
     if not parts:raise ValueError('没有成功导入网格：'+'；'.join(issues[:3]))
     meta={'id':ident,'body':'游戏角色资源 / '+time.strftime('%H:%M'),'exportProfile':'preview-only','parts':parts,'snapshot_source':snap.get('source'),'captured_at':snap.get('captured_at'),'resource_resolutions':resolutions,'limitations':['资源参考姿势，未还原实时骨骼与 Morph 变形','不同身体与头颈/生殖器的纹身层尚需适配；当前只预览',*issues]}
+    meta['body_gender']=body_profile.detect(sources,context.get('body_gender_hint'))
+    (folder/'snapshot-context.json').write_text(json.dumps(context,ensure_ascii=False,indent=2),encoding='utf-8')
     (folder/'model.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding='utf-8');(folder/'sources.json').write_text(json.dumps(sources,ensure_ascii=False,indent=2),encoding='utf-8')
-    return {'id':ident,'url':'/models/'+ident+'/model.json','parts':len(parts),'issues':issues}
+    import snapshot_identity
+    # Save the exact capture used, not a newer snapshot arriving during import.
+    stable={'components':sorted([snapshot_identity.identity(c) for c in snap['components'] if kind(c) and c.get('enabled') is not False],key=lambda c:json.dumps(c,sort_keys=True)),
+            'animation_components':sorted(snap.get('animation_components',[]),key=lambda c:c.get('name',''))}
+    latest={'id':ident,'url':'/models/'+ident+'/model.json','captured_at':snap.get('captured_at'),'live_signature':snapshot_identity.digest(stable)}
+    (MODELS/'latest-import.json').write_text(json.dumps(latest),encoding='utf-8')
+    return {'id':ident,'url':latest['url'],'parts':len(parts),'issues':issues}

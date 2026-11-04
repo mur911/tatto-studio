@@ -1,3 +1,6 @@
+import {snapshotCatalog} from './snapshot-locales.mjs';
+import {repairCatalog} from './repair-locales.mjs';
+import {releaseCatalog} from './release-locales.mjs';
 import {warpCatalog} from './warp-locales.mjs';
 // Source phrases stay separate from user names, filenames and saved design data.
 import {additionalTranslations} from './locales-pt-ru.mjs';
@@ -441,11 +444,12 @@ export const catalog=rows.trim().split('\n').map(line=>{
  return [...row,...additional];
 });
 catalog.push(...warpCatalog);
+for(const row of [...releaseCatalog,...repairCatalog,...snapshotCatalog]){const index=catalog.findIndex(r=>r[0]===row[0]);if(index<0)catalog.push(row);else catalog[index]=row}
 const exact=new Map(),patterns=[];
 for(const row of catalog){
  if(row.length!==translationOrder.length||row.some(value=>!value))throw new Error('Incomplete translation: '+row[0]);
  if(exact.has(row[0]))throw new Error('Duplicate translation: '+row[0]);
- exact.set(row[0],row);
+ exact.set(row[0],row);exact.set(row[1],row);
  if(/\{\d+\}/.test(row[0])){
   const keys=[];let at=0,expression='^';
   for(const match of row[0].matchAll(/\{(\d+)\}/g)){expression+=escape(row[0].slice(at,match.index))+'([\\s\\S]*?)';keys.push(Number(match[1]));at=match.index+match[0].length;}
@@ -453,10 +457,19 @@ for(const row of catalog){
  }
 }
 // Prefer specific sentences over a generic prefix containing a placeholder.
+// Responses already rendered in another language must follow later language changes.
+for(const row of catalog)for(const variant of row.slice(1)){
+ if(!exact.has(variant))exact.set(variant,row);
+ if(/\{\d+\}/.test(variant)){
+  const keys=[];let at=0,expression='^';
+  for(const match of variant.matchAll(/\{(\d+)\}/g)){expression+=escape(variant.slice(at,match.index))+'([\\s\\S]*?)';keys.push(Number(match[1]));at=match.index+match[0].length;}
+  patterns.push({row,keys,regex:new RegExp(expression+escape(variant.slice(at))+'$')});
+ }
+}
 patterns.sort((a,b)=>b.row[0].replace(/\{\d+\}/g,'').length-a.row[0].replace(/\{\d+\}/g,'').length);
 function escape(value){return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
 export function translate(source,language='zh-CN',depth=0){
- const index=translationOrder.indexOf(language);if(index<=0||depth>3)return source;
+ const index=translationOrder.indexOf(language);if(index<0||depth>3)return source;
  const content=source.trim(),row=exact.get(content);let result=row?.[index];
  if(result===undefined)for(const p of patterns){
   const match=content.match(p.regex);if(!match)continue;const args={};p.keys.forEach((key,i)=>args[key]=match[i+1]);

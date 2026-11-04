@@ -7,7 +7,7 @@ import time
 import uuid
 from storage_paths import LIBRARY_NAME,LAYOUT_VERSION,migrate_storage
 
-APPLICATION_VERSION = '1.0.0'
+APPLICATION_VERSION = '1.0.1'
 DATA_SCHEMA = 1
 from datalocation import PROGRAM_ROOT, ensure_data_directory
 DATA_ROOT = ensure_data_directory()

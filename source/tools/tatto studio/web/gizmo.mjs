@@ -1,3 +1,4 @@
+import {framePointer} from './frame-work.mjs';
 import {state,$,canvas,add,sub,mul,dot,cross,unit,cameraBasis,changed,updateUI,status,pick} from './app.js';
 import {rotateFrame,scaleProjection,radians,shortcutMode,projectionRadius} from './transform-math.mjs';
 import {editPoseLayer} from './pose-edit.mjs';
@@ -49,7 +50,7 @@ export function installGizmo(){
   drag={key,axis,planeAxes,mode:state.transformMode,layer:l,start:{...l,center:[...l.center],right:[...l.right],up:[...l.up],normal:[...l.normal]},x:e.clientX,y:e.clientY,origin,dx:end.x-origin.x,dy:end.y-origin.y,depthAxis:Math.hypot(end.x-origin.x,end.y-origin.y)<8,point:planePoint(e,l.center,axis)};
   state.externalDragging=true;document.body.classList.add('transform-drag');
  });
- window.addEventListener('pointermove',e=>{
+ framePointer(window,e=>{
   if(!drag)return;const a=drag,l=a.layer,dx=e.clientX-a.x,dy=e.clientY-a.y;
   if(a.mode==='move'){
    let center=[...a.start.center];
@@ -70,7 +71,7 @@ export function installGizmo(){
   }
   changed();updateUI();
  });
- const end=()=>{if(!drag)return;drag=null;state.externalDragging=false;document.body.classList.remove('transform-drag');status('变换已更新，保存设计后会保留。');};
+ const end=()=>{if(!drag)return;drag=null;state.externalDragging=false;updateUI();document.body.classList.remove('transform-drag');status('变换已更新，保存设计后会保留。');};
  window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);
  for(const button of document.querySelectorAll('[data-transform]'))button.onclick=()=>setMode(button.dataset.transform);
  window.addEventListener('keydown',e=>{const mode=shortcutMode(e);if(mode){e.preventDefault();setMode(mode);}});

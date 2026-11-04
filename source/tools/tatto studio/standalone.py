@@ -6,6 +6,7 @@ import library,publisher,models
 
 class SingleDesignLibrary:
     atomic=staticmethod(library.atomic)
+    hidden_only=staticmethod(library.hidden_only)
     def __init__(self,root,group,design):self.root=root;self.group=group;self.design=design
     def groups(self):return [copy.deepcopy(self.group)]
     def group_folder(self,ident):
@@ -53,7 +54,10 @@ def build(folder,payload,progress=lambda _:None):
     if model_id!='rb':
         source=models.MODELS/model_id/'sources.json'
         if source.exists():dependencies=sorted({pathlib.PureWindowsPath(r.get('archive','')).name for r in json.loads(source.read_text(encoding='utf-8')) if r.get('archive')})
+        import body_profile
+        dependencies=sorted(set(dependencies)|{pathlib.PureWindowsPath(p).name for p in body_profile.context(models.MODELS/model_id).get('resource_archives',[])})
     manifest={'format':'tattoo-workbench-standalone','version':1,'assetId':source_id,'title':title,'model':model,'body_archives':dependencies,'body_specific':True,'native_clothing_hide_rules':True,'collector_required':False,'editor_service_required':False,'game_tested':False,'archive':'twb_'+ident+'.archive'}
+    manifest['body_gender']=result['designs'][0]['body_gender']
     # _publish already closed its ZIP. Append only portable assets and metadata.
     with zipfile.ZipFile(output,'a',zipfile.ZIP_DEFLATED) as archive:
         archive.writestr('design.tattoo.json',json.dumps(project,ensure_ascii=False,indent=2))

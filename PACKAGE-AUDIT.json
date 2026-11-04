@@ -1,0 +1,14 @@
+{
+  "release_sha256": "b3b090532721b7a3b8b7762bfad79cf4d8247bc0a7850124d299f3bee125ce15",
+  "archive_bytes": 32196909,
+  "entries": 1284,
+  "zip_crc_verified": true,
+  "compression_methods": [
+    8
+  ],
+  "encrypted_entries": [],
+  "nested_zip_entries": [],
+  "mz_files": 58,
+  "first_party_custom_exe": false,
+  "interpretation": "These structural checks are not a malware verdict or a Nexus Mods approval."
+}

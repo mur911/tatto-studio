@@ -1,3 +1,4 @@
+import processes,resource_session,hashlib
 """Build private decal resources from locally captured meshes, never a fixed body.
 
 Files here are local generated content, not redistributable base-mod assets.
@@ -14,13 +15,17 @@ import subprocess
 import numpy as np
 from PIL import Image
 import models
+import body_profile
+import captured_rigs
 import tattoo_regions
+import head_decal
+import deformation_check
 from archive_order import ordered_archives
 from native_compression import ensure_native_codec
 
 ROOT = pathlib.Path(__file__).resolve().parent
 OLD = r'tatto_studio\diy_tattoo_rb_v01'
-VERSION = 7
+VERSION = 12
 
 
 def load(file):
@@ -46,7 +51,7 @@ def model_folder(ident):
 
 def run(args, log):
     ensure_native_codec(models.GAME)
-    p = subprocess.run([str(models.CLI), *map(str, args)], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
+    p = processes.run([str(models.CLI), *map(str, args)], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
     with log.open('a', encoding='utf-8') as f:
         f.write(p.stdout + p.stderr + '\n')
     if p.returncode or re.search(r'\bError\b', p.stdout) or "Oodle couldn't be loaded" in p.stdout + p.stderr:
@@ -57,12 +62,17 @@ def prepare(ident, progress=lambda _: None):
     """Extract only the native CMesh dependencies of captured morph resources."""
     folder = model_folder(ident)
     records = load(folder / 'sources.json')
-    if not any('player_female_average' in r['component'].get('path','') or '_pwa_' in r['component'].get('name','') for r in records):
-        raise ValueError('当前测试版的游戏选项仅支持女V；其他角色可预览，尚不能生成纹身输出。')
+    body_gender = body_profile.detect(records, body_profile.context(folder).get('body_gender_hint'))
     work = folder / 'decal-profile'
     work.mkdir(exist_ok=True)
     (work / 'json').mkdir(exist_ok=True)
     dependencies = {}
+    provenance = {}
+    try:
+        previous = load(work / 'profile.json')
+        if not isinstance(previous,dict):previous={}
+    except (OSError,ValueError):previous={}
+    archives = ordered_archives(models.GAME)
     for record in records:
         doc = load(pathlib.Path(record['mesh_json']))
         root = doc['Data']['RootChunk']
@@ -71,12 +81,17 @@ def prepare(ident, progress=lambda _: None):
         path = root['baseMesh']['DepotPath']['$value']
         h = models.fnv(path)
         output = work / 'json' / (pathlib.PureWindowsPath(path).name + '.json')
-        if output.exists():
-            dependencies[record['atlas']] = str(output)
-            continue
-        archive = next((p for p in ordered_archives(models.GAME) if h in models.archive_hashes(p, {h})), None)
+        archive = next((p for p in archives if h in models.archive_hashes(p, {h})), None)
         if archive is None:
             raise ValueError('Morph基础网格来源缺失：' + path)
+        stat=archive.stat()
+        origin={'resource':path,'archive':str(archive),'size':stat.st_size,'mtime_ns':stat.st_mtime_ns}
+        prior=previous.get('dependencies',{}).get(record['atlas'],{})
+        old_file=pathlib.Path(previous.get('bases',{}).get(record['atlas'],str(output)))
+        provenance[record['atlas']]=origin
+        if prior.get('origin')==origin and old_file.is_file() and prior.get('sha256')==resource_session.sha(old_file):
+            dependencies[record['atlas']]=str(old_file)
+            continue
         dependencies[record['atlas']] = {'archive': str(archive), 'hash': h, 'path': path, 'output': str(output)}
     batches = {}
     for value in dependencies.values():
@@ -100,16 +115,34 @@ def prepare(ident, progress=lambda _: None):
             if len(files) != 1:
                 raise ValueError('未提取到实际基础网格：' + e['path'])
             dependencies[next(k for k, v in dependencies.items() if v is e)] = str(files[0])
-    result = {'version': VERSION, 'bases': dependencies, 'experimental': True}
-    (work / 'profile.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+    result = {'version': VERSION, 'bases': dependencies, 'body_gender': body_gender, 'experimental': True,
+              'dependencies':{atlas:{'origin':origin,'sha256':resource_session.sha(pathlib.Path(dependencies[atlas]))} for atlas,origin in provenance.items()}}
+    if result != previous:
+        (work / 'profile.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
     meta = load(folder / 'model.json')
     meta['exportProfile'] = 'captured-decal-v1'
+    meta['body_gender'] = body_gender
     meta['limitations'] = [x for x in meta.get('limitations', []) if '当前只预览' not in x and '头颈设计请单独建分组' not in x]
     warning = '实际网格纹身输出为测试版；支持头颈与身体同组，首次请核对第一人称显示；脸型预览仍为参考形状'
     if warning not in meta['limitations']:
         meta['limitations'].insert(0, warning)
     (folder / 'model.json').write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding='utf-8')
     return result
+
+
+def gender(ident):
+    folder = model_folder(ident)
+    return body_profile.detect(load(folder / 'sources.json'), body_profile.context(folder).get('body_gender_hint'))
+
+
+def pubic_rig(body_gender):
+    template = load(ROOT / 'templates/json/pubic.app.json')
+    rig = copy.deepcopy(next(c for c in template['Data']['RootChunk']['appearances'][0]['Data']['compiledData']['Data']['Chunks'] if c['$type'] == 'entAnimatedComponent'))
+    if body_gender == 'male':
+        for key in ('rig', 'graph'):
+            path = rig[key]['DepotPath']['$value']
+            rig[key]['DepotPath']['$value'] = path.replace('player_female_average', 'player_man_average').replace('_pwa_', '_pma_')
+    return rig
 
 
 def offset_blob(blob, distance=.00035):
@@ -293,24 +326,34 @@ def hide_rules(lines, aliases):
 
 def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=False, blank_domain='body'):
     folder = model_folder(ident)
-    if not (folder / 'decal-profile/profile.json').exists():
-        prepare(ident, progress)
-    profile = load(folder / 'decal-profile/profile.json')
+    profile_file = folder / 'decal-profile/profile.json'
+    # A profile version alone does not detect changed base-mesh dependencies.
+    profile = prepare(ident, progress)
+    body_gender = profile['body_gender']
     sources = load(folder / 'sources.json')
     active = []
     for record in sources:
         file = atlas_dir / (record['atlas'] + '.png')
         if not file.exists():
             raise ValueError('设计缺少当前角色的烘焙贴图，请重新打开并保存')
-        with Image.open(file) as image:
-            if image.convert('RGBA').getchannel('A').getbbox():
-                active.append(record)
+        if resource_session.ink(file):active.append(record)
     if not active and allow_blank:
         # Keep one transparent overlay so the same game option clears old ink.
         matching=[r for r in sources if ('head' if r['atlas'].split('_')[0] in ('head','neck') else 'body')==blank_domain]
         active=(matching or sources)[:1]
     if not active:
         raise ValueError('没有纹身落在当前角色上')
+    signature_files=[folder/'decal-profile/profile.json',folder/'sources.json',*sorted((ROOT/'templates/json').glob('*.json'))]
+    if (folder/'snapshot-context.json').is_file():signature_files.append(folder/'snapshot-context.json')
+    signature_files += [pathlib.Path(r['mesh_json']) for r in active]
+    signature_files += [pathlib.Path(p) for p in profile.get('bases',{}).values()]
+    signature=hashlib.sha256((str(VERSION)+str(blank_domain)+','.join(r['atlas'] for r in active)+''.join(resource_session.sha(p) for p in signature_files)).encode()).hexdigest()
+    stamp=out/'generation-cache.json'
+    if stamp.is_file():
+        try:
+            cached=load(stamp)
+            if cached['signature']==signature and all((out/name).is_file() and resource_session.sha(out/name)==digest for name,digest in cached['files'].items()):return load(out/'profile-manifest.json')
+        except (ValueError,KeyError,OSError):pass
     domains = {'head' if r['atlas'].split('_')[0] in ('head', 'neck') else 'body' for r in active}
     out.mkdir(parents=True, exist_ok=True)
     # These are generated templates, not saved designs. Remove stale head parts
@@ -319,7 +362,17 @@ def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=Fals
         if file.name.endswith(('.mesh.json','.morphtarget.json','.app.json')):file.unlink()
     components = []
     head_components = []
+    context=body_profile.context(folder)
+    bindings = captured_rigs.Bindings(context, body_gender, pubic_rig)
+    # Auxiliary genital bindings require a captured live source, not a guessed rig.
+    for record in active:
+        if record['atlas'].split('_')[0]!='genitals':continue
+        for key in ('bind_name','skinning_bind'):
+            name=record['component'].get(key) or 'root'
+            if name.lower() not in ('root','none') and name not in bindings.records:
+                raise ValueError('The captured genital animation source is missing. Capture the character again.')
     aliases = []
+    deformation = {}
     for i, record in enumerate(active):
         atlas = record['atlas']
         original = load(pathlib.Path(record['mesh_json']))
@@ -328,6 +381,11 @@ def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=Fals
         native_mesh = load(pathlib.Path(profile['bases'][atlas])) if morph else original
         blob = original_root['blob']['Data']['baseBlob']['Data'] if morph else None
         mesh = decal_mesh(native_mesh, atlas, blob)
+        check_source=copy.deepcopy(native_mesh)
+        if blob is not None:check_source['Data']['RootChunk']['renderResourceBlob']['Data']=copy.deepcopy(blob)
+        deformation[atlas]=deformation_check.verify(check_source,None,mesh)
+        if atlas.split('_')[0] in ('head','neck'):
+            head_decal.normalize(mesh)
         (out / (atlas + '.mesh.json')).write_text(json.dumps(mesh), encoding='utf-8')
         if morph:
             target = copy.deepcopy(original)
@@ -335,6 +393,8 @@ def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=Fals
             root['baseMesh'] = resource(OLD + '\\meshes\\' + atlas + '.mesh')
             root['baseMeshAppearance'] = cname('tatto_studio_diy_rb_' + atlas)
             root['blob']['Data']['baseBlob']['Data'] = copy.deepcopy(mesh['Data']['RootChunk']['renderResourceBlob']['Data'])
+            if atlas.split('_')[0] not in ('head','neck'):
+                deformation_check.verify(native_mesh,original,mesh,target)
             (out / (atlas + '.morphtarget.json')).write_text(json.dumps(target), encoding='utf-8')
         template = load(ROOT / ('templates/json/pubic.app.json' if morph else 'templates/json/tattoos.app.json'))
         component = copy.deepcopy(template['Data']['RootChunk']['appearances'][0]['Data']['compiledData']['Data']['Chunks'][0])
@@ -344,20 +404,17 @@ def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=Fals
         component['meshAppearance'] = cname('tatto_studio_diy_rb_' + atlas)
         component['chunkMask'] = str(tattoo_regions.overlay_mask(original, record['component'].get('appearance'), int(record['mask'])) & 0x7fffffffffffffff)
         component['morphResource' if morph else 'mesh'] = resource(OLD + '\\meshes\\' + atlas + ('.morphtarget' if morph else '.mesh'))
+        binding_domain='head' if len(domains)>1 and atlas.split('_')[0] in ('head','neck') else 'body'
         for j, key in enumerate(('parentTransform', 'skinning')):
             component[key]['HandleId'] = str(100 + i * 2 + j)
-            component[key]['Data']['bindName'] = cname(record['component'].get('bind_name' if key == 'parentTransform' else 'skinning_bind') or 'root')
-        # Keep supported native dangle bindings available across photo-mode
-        # and perspective transitions, independently of the naked-body slot.
-        if atlas.split('_')[0]=='genitals' and record['component'].get('skinning_bind')=='penis_dangles':
-            rig=copy.deepcopy(next(c for c in load(ROOT/'templates/json/pubic.app.json')['Data']['RootChunk']['appearances'][0]['Data']['compiledData']['Data']['Chunks'] if c['$type']=='entAnimatedComponent'))
-            rig_name='tatto_studio_diy_rb_'+atlas+'_rig';rig['name']=cname(rig_name);rig['id']=str(7812330769892095900+i)
-            for j,key in enumerate(('parentTransform','controlBinding')):rig[key]['HandleId']=str(500+i*2+j)
-            for key in ('parentTransform','skinning'):component[key]['Data']['bindName']=cname(rig_name)
-            components.append(rig)
+            component[key]['Data']['bindName'] = cname(bindings.bind(record['component'].get('bind_name' if key == 'parentTransform' else 'skinning_bind') or 'root',binding_domain))
+        # Preserve both source bindings: attachment and skinning can use
+        # different components. Both must resolve to the live actor's rigs.
         if len(domains)>1 and atlas.split('_')[0] in ('head','neck'):head_components.append(component)
         else:components.append(component)
         aliases.append({'original': record['component']['name'], 'overlay': overlay_component_name(record), 'atlas': atlas})
+    components[0:0]=bindings.components['body']
+    head_components[0:0]=bindings.components['head']
     (out / 'tattoos.app.json').write_text(json.dumps(appearance(components)), encoding='utf-8')
     if head_components:
         (out / 'head_overlay.app.json').write_text(json.dumps(appearance(head_components,'tatto_studio_diy_rb_head_on')), encoding='utf-8')
@@ -369,6 +426,7 @@ def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=Fals
     switch['options'][0]['names'] = [cname('tatto_studio_diy_rb_off')]
     switch['options'][1]['names'] = [cname('tatto_studio_diy_rb_on')]
     switch['uiSlots'] = [options[1]['Data']['uiSlot']]
+    head_options = []
     if head_components:
         extra=copy.deepcopy(options[1:3])
         for suffix,entry in zip(('off','on'),extra):
@@ -377,20 +435,35 @@ def generate(ident, atlas_dir, out, progress=lambda _: None, *, allow_blank=Fals
         extra[1]['Data']['resource']=resource(OLD+'\\appearances\\head_overlay.app','Soft')
         extra[1]['Data']['definitions'][0]['name']=cname('tatto_studio_diy_rb_head_on')
         for i,entry in enumerate(extra,3):entry['HandleId']=str(i)
-        options.extend(extra)
-        switch['uiSlots'].append(cname('tatto_studio_diy_rb_head_slot'))
-        switch['options'][0]['names'].append(cname('tatto_studio_diy_rb_head_off'))
-        switch['options'][1]['names'].append(cname('tatto_studio_diy_rb_head_on'))
-    # One visible selector drives private body/head appearances in the same
-    # customization category. FPP only enumerates the body appearance slots.
+        head_switch=copy.deepcopy(options[0])
+        head_switch['HandleId']='5'
+        follower=head_switch['Data']
+        follower['name']=cname('tatto_studio_diy_rb_head_switch')
+        follower['uiSlot']=cname('tatto_studio_diy_rb_head_switcher')
+        follower['uiSlots']=[cname('tatto_studio_diy_rb_head_slot')]
+        follower['hidden']=1
+        for suffix,choice in zip(('off','on'),follower['options']):
+            choice['names']=[cname('tatto_studio_diy_rb_head_'+suffix)]
+        switch['link']=follower['link']=cname('tatto_studio_diy_rb_selection_link')
+        switch['linkController']=1
+        follower['linkController']=0
+        head_options=[head_switch,*extra]
+    # A shared selection does not imply a shared render scope. Head geometry
+    # must be requested through headGroups (including TPP_photomode), and must
+    # never enter FPP_Body. Native cross-part links synchronize the indices.
     names = [cname('tatto_studio_diy_rb_' + x) for x in ('switch', 'off', 'on')]
-    combined_names=names+[cname('tatto_studio_diy_rb_head_'+x) for x in ('off','on')] if head_components else names
     group_names = ['TPP', 'TPP_photomode', 'character_customization'] if domains == {'head'} else ['FPP_Body', 'TPP_Body', 'character_creation']
-    root['headCustomizationOptions'] = options if domains == {'head'} else []
+    root['headCustomizationOptions'] = options if domains == {'head'} else head_options
     root['bodyCustomizationOptions'] = options if 'body' in domains else []
-    root['headGroups'] = [{'$type': 'gameuiOptionsGroup', 'name': cname(g), 'options': names} for g in group_names] if domains == {'head'} else []
-    root['bodyGroups'] = [{'$type': 'gameuiOptionsGroup', 'name': cname(g), 'options': names if g=='FPP_Body' else combined_names} for g in group_names] if 'body' in domains else []
+    head_names=[entry['Data']['name'] for entry in head_options] if head_options else names
+    root['headGroups'] = [{'$type':'gameuiOptionsGroup','name':cname(g),'options':head_names} for g in ('TPP','TPP_photomode','character_customization')] if 'head' in domains else []
+    root['bodyGroups'] = [{'$type': 'gameuiOptionsGroup', 'name': cname(g), 'options': names} for g in group_names] if 'body' in domains else []
     (out / 'diy_pwa.inkcharcustomization.json').write_text(json.dumps(info), encoding='utf-8')
-    result = {'version': VERSION, 'cache_version':VERSION,'domain': 'mixed' if len(domains)>1 else next(iter(domains)), 'option_domain':'body' if 'body' in domains else 'head','domains':sorted(domains),'atlases': [r['atlas'] for r in active], 'aliases': aliases, 'experimental': True}
+    result = {'version': VERSION, 'cache_version':VERSION,'body_gender':body_gender,'domain': 'mixed' if len(domains)>1 else next(iter(domains)), 'option_domain':'body' if 'body' in domains else 'head','domains':sorted(domains),'atlases': [r['atlas'] for r in active], 'aliases': aliases, 'experimental': True}
+    import snapshot_identity
+    result['resource_identity']=snapshot_identity.saved(ident,[r['atlas'] for r in active])
+    result['deformation']=deformation
     (out / 'profile-manifest.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+    files={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in out.glob('*.json') if p!=stamp}
+    stamp.write_text(json.dumps({'signature':signature,'files':files}),encoding='utf-8')
     return result

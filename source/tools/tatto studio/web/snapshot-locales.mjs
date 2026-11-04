@@ -1,0 +1,190 @@
+export const snapshotCatalog=[
+ [
+  "快照匹配检查",
+  "Snapshot compatibility",
+  "Compatibilité de la capture",
+  "Compatibilità istantanea",
+  "スナップショットの互換性",
+  "Snapshot-Kompatibilität",
+  "Compatibilidad de captura",
+  "Compatibilidade da captura",
+  "Совместимость снимка"
+ ],
+ [
+  "设计使用的快照：",
+  "Design snapshot:",
+  "Capture du projet :",
+  "Istantanea del progetto:",
+  "デザインのスナップショット：",
+  "Design-Snapshot:",
+  "Captura del diseño:",
+  "Captura do projeto:",
+  "Снимок дизайна:"
+ ],
+ [
+  "最近读取的快照：",
+  "Last imported snapshot:",
+  "Dernière capture importée :",
+  "Ultima istantanea importata:",
+  "最後に読み込んだスナップショット：",
+  "Zuletzt importierter Snapshot:",
+  "Última captura importada:",
+  "Última captura importada:",
+  "Последний импортированный снимок:"
+ ],
+ [
+  "用当前快照另存副本",
+  "Adapt a copy to the current character",
+  "Adapter une copie au personnage actuel",
+  "Adatta una copia al personaggio attuale",
+  "現在のキャラクターに合わせたコピーを保存",
+  "Kopie an aktuellen Charakter anpassen",
+  "Adaptar una copia al personaje actual",
+  "Adaptar uma cópia ao personagem atual",
+  "Адаптировать копию к текущему персонажу"
+ ],
+ [
+  "无法核对当前游戏角色，请先读取快照。",
+  "Cannot verify the current character. Capture a snapshot first.",
+  "Impossible de vérifier le personnage actuel. Importez une capture.",
+  "Impossibile verificare il personaggio attuale. Acquisisci un’istantanea.",
+  "現在のキャラクターを確認できません。先にスナップショットを取得してください。",
+  "Aktueller Charakter nicht überprüfbar. Zuerst einen Snapshot erfassen.",
+  "No se puede verificar el personaje actual. Captura una instantánea.",
+  "Não foi possível verificar o personagem atual. Faça uma captura.",
+  "Не удалось проверить текущего персонажа. Сначала сделайте снимок."
+ ],
+ [
+  "设计资源与当前游戏快照一致。",
+  "Design resources match the current game snapshot.",
+  "Les ressources correspondent à la capture actuelle.",
+  "Le risorse corrispondono all’istantanea attuale.",
+  "デザインのリソースは現在のゲームのスナップショットと一致しています。",
+  "Design-Ressourcen stimmen mit dem aktuellen Snapshot überein.",
+  "Los recursos coinciden con la captura actual del juego.",
+  "Os recursos correspondem à captura atual do jogo.",
+  "Ресурсы дизайна соответствуют текущему снимку игры."
+ ],
+ [
+  "设计资源与当前游戏角色不同。旧设计不会自动更换模型。",
+  "This design uses different character resources. Its model is not changed automatically.",
+  "Ce projet utilise d’autres ressources. Son modèle ne change pas automatiquement.",
+  "Questo progetto usa risorse diverse. Il modello non cambia automaticamente.",
+  "このデザインは異なるキャラクターのリソースを使用しています。モデルは自動変更されません。",
+  "Dieses Design verwendet andere Charakter-Ressourcen. Sein Modell wird nicht automatisch geändert.",
+  "Este diseño usa otros recursos. Su modelo no cambia automáticamente.",
+  "Este projeto usa outros recursos. O modelo não muda automaticamente.",
+  "Дизайн использует другие ресурсы персонажа. Модель не меняется автоматически."
+ ],
+ [
+  "发布前确认模型",
+  "Review models before publishing",
+  "Vérifier les modèles avant publication",
+  "Verifica i modelli prima di pubblicare",
+  "公開前にモデルを確認",
+  "Modelle vor Veröffentlichung prüfen",
+  "Revisar modelos antes de publicar",
+  "Verificar modelos antes de publicar",
+  "Проверка моделей перед публикацией"
+ ],
+ [
+  "部分设计与当前游戏角色不同。取消后可适配副本；保留原模型适用于其他角色，不会自动适配当前角色。",
+  "Some designs differ from the current character. Cancel to adapt a copy, or keep their original models for other characters.",
+  "Certains projets diffèrent du personnage actuel. Annulez pour adapter une copie, ou conservez leurs modèles pour d’autres personnages.",
+  "Alcuni progetti differiscono dal personaggio attuale. Annulla per adattare una copia o conserva i modelli per altri personaggi.",
+  "現在のキャラクターと異なるデザインがあります。キャンセルしてコピーを適合するか、他のキャラクター用に元のモデルを維持してください。",
+  "Einige Designs passen nicht zum aktuellen Charakter. Abbrechen, um eine Kopie anzupassen, oder Originalmodelle für andere Charaktere behalten.",
+  "Algunos diseños no coinciden con el personaje actual. Cancela para adaptar una copia o conserva los modelos para otros personajes.",
+  "Alguns projetos diferem do personagem atual. Cancele para adaptar uma cópia ou mantenha os modelos para outros personagens.",
+  "Некоторые дизайны отличаются от текущего персонажа. Отмените публикацию для адаптации копии или сохраните модели для других персонажей."
+ ],
+ [
+  "取消并检查快照",
+  "Cancel and check snapshots",
+  "Annuler et vérifier les captures",
+  "Annulla e verifica le istantanee",
+  "キャンセルしてスナップショットを確認",
+  "Abbrechen und Snapshots prüfen",
+  "Cancelar y revisar capturas",
+  "Cancelar e verificar capturas",
+  "Отменить и проверить снимки"
+ ],
+ [
+  "明确保留原模型并发布",
+  "Keep original models and publish",
+  "Conserver les modèles et publier",
+  "Mantieni i modelli originali e pubblica",
+  "元のモデルを維持して公開",
+  "Originalmodelle behalten und veröffentlichen",
+  "Conservar modelos originales y publicar",
+  "Manter modelos originais e publicar",
+  "Сохранить исходные модели и опубликовать"
+ ],
+ [
+  "请先读取角色快照再比较资源。",
+  "Capture a character snapshot before comparing resources.",
+  "Importez une capture avant de comparer les ressources.",
+  "Acquisisci un’istantanea prima di confrontare le risorse.",
+  "リソースを比較する前にスナップショットを取得してください。",
+  "Vor dem Ressourcenvergleich einen Snapshot erfassen.",
+  "Captura el personaje antes de comparar recursos.",
+  "Capture o personagem antes de comparar os recursos.",
+  "Сделайте снимок персонажа перед сравнением ресурсов."
+ ],
+ [
+  "请先检查快照差异，再适配副本或明确保留原模型发布。",
+  "Review snapshot differences before publishing. Adapt a copy or explicitly keep the original models.",
+  "Vérifiez les différences avant publication. Adaptez une copie ou conservez explicitement les modèles.",
+  "Verifica le differenze prima di pubblicare. Adatta una copia o mantieni esplicitamente i modelli originali.",
+  "公開前にスナップショットの違いを確認し、コピーを適合するか元のモデルを維持してください。",
+  "Unterschiede vor Veröffentlichung prüfen. Kopie anpassen oder Originalmodelle ausdrücklich behalten.",
+  "Revisa las diferencias antes de publicar. Adapta una copia o conserva expresamente los modelos originales.",
+  "Verifique as diferenças antes de publicar. Adapte uma cópia ou mantenha explicitamente os modelos originais.",
+  "Проверьте различия снимков перед публикацией. Адаптируйте копию или явно сохраните исходные модели."
+ ],
+ [
+  "发布过程中角色快照发生变化，请检查后重试。",
+  "The character snapshot changed during publishing. Review it and try again.",
+  "La capture a changé pendant la publication. Vérifiez-la et réessayez.",
+  "L’istantanea è cambiata durante la pubblicazione. Verifica e riprova.",
+  "公開中にスナップショットが変更されました。確認して再試行してください。",
+  "Der Snapshot wurde während der Veröffentlichung geändert. Prüfen und erneut versuchen.",
+  "La captura cambió durante la publicación. Revísala e inténtalo de nuevo.",
+  "A captura mudou durante a publicação. Verifique e tente novamente.",
+  "Снимок изменился во время публикации. Проверьте его и повторите попытку."
+ ],
+ [
+  "纹身动画数据校验失败，原游戏资源已保留。",
+  "Tattoo animation data validation failed. Original game resources were preserved.",
+  "La validation des données d’animation a échoué. Les ressources originales sont conservées.",
+  "Verifica dei dati di animazione fallita. Le risorse originali sono state conservate.",
+  "タトゥーのアニメーションデータ検証に失敗しました。元のゲームリソースは保持されています。",
+  "Prüfung der Tattoo-Animationsdaten fehlgeschlagen. Originalressourcen wurden beibehalten.",
+  "Falló la validación de animación. Se conservaron los recursos originales.",
+  "A validação da animação falhou. Os recursos originais foram preservados.",
+  "Проверка данных анимации татуировки не пройдена. Исходные ресурсы сохранены."
+ ],
+ [
+  "快照缺少生殖器动画来源，请重新读取角色。",
+  "The captured genital animation source is missing. Capture the character again.",
+  "La source d’animation des organes génitaux manque. Importez à nouveau le personnage.",
+  "Manca la sorgente di animazione dei genitali. Acquisisci di nuovo il personaggio.",
+  "性器のアニメーション元がありません。キャラクターを再取得してください。",
+  "Die Animationsquelle der Genitalien fehlt. Charakter erneut erfassen.",
+  "Falta la fuente de animación genital. Captura el personaje de nuevo.",
+  "A fonte da animação genital está ausente. Capture o personagem novamente.",
+  "Отсутствует источник анимации гениталий. Повторно сделайте снимок персонажа."
+ ],
+ [
+  "请先打开已保存的纹身，再适配副本。",
+  "Open a saved tattoo before adapting a copy.",
+  "Ouvrez un tatouage enregistré avant d’adapter une copie.",
+  "Apri un tatuaggio salvato prima di adattare una copia.",
+  "コピーを適合する前に保存済みのタトゥーを開いてください。",
+  "Vor dem Anpassen einer Kopie ein gespeichertes Tattoo öffnen.",
+  "Abre un tatuaje guardado antes de adaptar una copia.",
+  "Abra uma tatuagem salva antes de adaptar uma cópia.",
+  "Откройте сохранённую татуировку перед адаптацией копии."
+ ],
+["部分图层使用的部位不在此快照中，请读取完整快照后再适配或发布。", "Some layers reference body parts missing from this snapshot. Capture a complete snapshot before adapting or publishing.", "Certaines parties utilisées par les calques sont absentes de cette capture. Effectuez une capture complète avant adaptation ou publication.", "Alcune parti usate dai livelli mancano in questa istantanea. Acquisisci un’istantanea completa prima di adattare o pubblicare.", "一部のレイヤーが使用する部位がこのスナップショットにありません。適合や公開の前に完全なスナップショットを取得してください。", "Einige von Ebenen verwendete Körperteile fehlen in diesem Snapshot. Vor dem Anpassen oder Veröffentlichen einen vollständigen Snapshot aufnehmen.", "Faltan partes usadas por algunas capas en esta captura. Obtén una captura completa antes de adaptar o publicar.", "Faltam partes usadas por algumas camadas nesta captura. Faça uma captura completa antes de adaptar ou publicar.", "В этом снимке отсутствуют части тела, используемые слоями. Перед адаптацией или публикацией сделайте полный снимок."]
+];

@@ -1,12 +1,13 @@
+import {preferredLanguage,diagnostic} from './api-messages.mjs';
 import {languages,translate} from './locales.mjs';
 import {readPreference,writePreference} from './ui-preferences.mjs';
 
 // Presentation only: never translate input values, user names or serialized designs.
 const textRecords=new WeakMap(),attributeRecords=new WeakMap();
-const ignored='script,style,textarea,code,.inline-name,.inline-name-input,#languageSelect,#projectTitle,#newGroupName,#renameGroupName,#libraryPath';
+const ignored='script,style,textarea,code,.inline-name,.inline-name-input,#languageSelect,#projectTitle,#newGroupName,#renameGroupName,#libraryPath,.path-value,[data-user-text]';
 const attributes=['title','aria-label','placeholder','alt'];
-let language=readPreference('language','zh-CN');
-if(!languages.some(([code])=>code===language))language='zh-CN';
+let language=preferredLanguage();
+if(!languages.some(([code])=>code===language))language='en';
 export const currentLanguage=()=>language;
 const select=document.getElementById('languageSelect');
 for(const [code,label]of languages){const option=document.createElement('option');option.value=code;option.textContent=label;option.lang=code;select.append(option)}
@@ -25,7 +26,7 @@ function text(node){
 }
 function parentTranslation(source,parent){return translate(source,language)}
 function element(node){
- if(node.closest('script,style,textarea,code'))return;
+ if(node.closest('script,style,textarea,code,[data-user-text],.inline-name,.inline-name-input'))return;
  let records=attributeRecords.get(node);if(!records){records={};attributeRecords.set(node,records)}
  for(const name of attributes){if(name==='aria-label'&&node.matches('.library-group'))continue;const value=node.getAttribute(name);if(value===null){delete records[name];continue}const old=records[name],source=old&&value===old.rendered?old.source:value,rendered=translate(source,language);records[name]={source,rendered};if(value!==rendered)node.setAttribute(name,rendered)}
 }
@@ -51,5 +52,10 @@ function apply(){
  // Layout changes can resize the stage; renderer's existing ResizeObserver handles it.
  document.dispatchEvent(new CustomEvent('tattoo:language-changed',{detail:{language}}));
 }
-select.addEventListener('change',()=>{if(!languages.some(([code])=>code===select.value))return;language=select.value;writePreference('language',language);apply()});
+async function rememberLanguage(){try{const config=await(await fetch('/api/config')).json();await fetch('/api/preferences/language',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Token':config.token},body:JSON.stringify({language})})}catch{}}
+select.addEventListener('change',()=>{if(!languages.some(([code])=>code===select.value))return;language=select.value;writePreference('language',language);apply();rememberLanguage()});
 apply();
+rememberLanguage();
+
+const tools=document.createElement('span'),log=document.createElement('a'),copy=document.createElement('button');
+log.textContent='查看日志';log.href='/api/log';log.target='_blank';log.rel='noopener';copy.textContent='复制错误信息';copy.type='button';copy.onclick=()=>navigator.clipboard.writeText(diagnostic()||document.getElementById('status')?.textContent||'');tools.append(log,document.createTextNode(' '),copy);document.querySelector('footer,#diagnostics')?.append(tools);

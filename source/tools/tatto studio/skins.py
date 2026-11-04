@@ -1,3 +1,4 @@
+import processes
 """Local-only skin reference extraction. Never included in tattoo bake/output."""
 import hashlib,json,pathlib,re,shutil,struct,subprocess,threading,time
 import numpy as np
@@ -31,7 +32,7 @@ class Resources:
                 except (OSError,ValueError,struct.error):continue
         for name in ('raw','cooked','json','export'):(folder/name).mkdir(parents=True,exist_ok=True)
     def run(self,args):
-        p=subprocess.run([str(models.CLI),*map(str,args),'-v','Normal'],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=240)
+        p=processes.run([str(models.CLI),*map(str,args),'-v','Normal'],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=240)
         with (self.folder/'build.log').open('a',encoding='utf-8') as f:f.write(p.stdout+p.stderr+'\n')
         if p.returncode or re.search(r'\bError\b',p.stdout):raise ValueError('皮肤资源转换失败，详见 skin/build.log')
     def archive(self,path):

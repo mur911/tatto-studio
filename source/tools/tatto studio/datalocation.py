@@ -37,6 +37,9 @@ def data_directory(program_root=PROGRAM_ROOT, override=None):
     program_root = Path(program_root).resolve()
     if override is None:
         override = os.environ.get('TATTO_STUDIO_DATA_DIR')
+    if not override:
+        from relocation import remembered
+        override = remembered()
     if override:
         if not Path(override).is_absolute():
             raise RuntimeError('TATTO_STUDIO_DATA_DIR must be an absolute path.')
@@ -102,7 +105,8 @@ def ensure_data_directory(program_root=PROGRAM_ROOT, override=None):
     program_root = Path(program_root).resolve()
     root = data_directory(program_root, override)
     legacy = (program_root.parent / DATA_NAME).resolve()
-    explicit_override = bool(override or os.environ.get('TATTO_STUDIO_DATA_DIR'))
+    from relocation import remembered
+    explicit_override = bool(override or os.environ.get('TATTO_STUDIO_DATA_DIR') or remembered())
     if not explicit_override and legacy != root and legacy.exists():
         if legacy.is_symlink() or not legacy.is_dir() or root.is_relative_to(legacy):
             raise RuntimeError('The previous data directory cannot be migrated safely.')
@@ -112,11 +116,11 @@ def ensure_data_directory(program_root=PROGRAM_ROOT, override=None):
             legacy.rmdir()
         else:
             root.parent.mkdir(parents=True, exist_ok=True)
-            if root.exists():
-                root.rmdir()  # Only an empty target can be replaced.
-            marker = legacy / 'data-location.json'
-            marker.write_text(json.dumps({'state': 'pending', 'previous_directory': str(legacy)}, indent=2), encoding='utf-8')
-            legacy.rename(root)
+            from relocation import prepare, remember
+            prepare(legacy, root, staging=discover_staging(program_root))
+            marker = root / 'data-location.json'
+            marker.write_text(json.dumps({'state': 'complete', 'previous_directory': str(legacy), 'data_directory': str(root)}, indent=2), encoding='utf-8')
+            remember(root)
     root.mkdir(parents=True, exist_ok=True)
     _finish_migration(root)
     return root

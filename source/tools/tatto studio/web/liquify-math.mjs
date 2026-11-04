@@ -5,7 +5,11 @@ export const PUSH_TEXTURE_WIDTH=MAX_PUSHES*4;
 const sub=(a,b)=>a.map((v,i)=>v-b[i]),mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
 // Legacy strokes remain projector-local. Never reinterpret them as chart UVs
 // when a layer changes projection, or reinterpret chart strokes as 3D pushes.
-export const activeLiquifyStrokes=l=>l.projection==='uv'?[]:(l.liquify?.strokes||[]).filter(s=>(l.projection==='warp')===(s.space==='warp'));
+const strokeViews=new WeakMap(),emptyStrokes=Object.freeze([]);
+export function activeLiquifyStrokes(l){
+ const source=l.liquify?.strokes;if(l.projection==='uv'||!source?.length)return emptyStrokes;
+ let cached=strokeViews.get(source);if(!cached){cached={warp:source.filter(s=>s.space==='warp'),normal:source.filter(s=>s.space!=='warp')};strokeViews.set(source,cached)}return l.projection==='warp'?cached.warp:cached.normal;
+}
 export function deformWarpPoint(l,q,normal){return inversePush([...q,0],normal,activeLiquifyStrokes(l)).slice(0,2)}
 export function validateLiquify(value){
  if(value===undefined)return;

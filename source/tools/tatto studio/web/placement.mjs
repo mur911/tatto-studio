@@ -1,3 +1,4 @@
+import {framePointer} from './frame-work.mjs';
 import {beginPointerSort,HOLD_MS} from './hold-sort.mjs';
 import {state,$,canvas,gl,add,sub,mul,unit,cross,textureAlpha,pick,changed,updateUI,status,render} from './app.js';
 import {uprightFrame,projectionRadius} from './transform-math.mjs';
@@ -29,7 +30,7 @@ export function installPlacement(){
    const pending=gesture;pending.timer=setTimeout(()=>{if(gesture===pending&&!pending.moved)startSort(pending)},HOLD_MS);
   };
  };
- window.addEventListener('pointermove',e=>{
+ framePointer(window,e=>{
   if(!gesture||e.pointerId!==gesture.id)return;const a=gesture;
   if(!a.moved&&Math.hypot(e.clientX-a.x,e.clientY-a.y)<6)return;
   if(!a.moved){const box=$('layers').getBoundingClientRect(),inside=e.clientX>=box.left&&e.clientX<=box.right&&e.clientY>=box.top&&e.clientY<=box.bottom;

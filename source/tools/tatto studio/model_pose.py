@@ -8,7 +8,7 @@ import numpy as np
 import models
 import profiles
 
-VERSION = 1
+VERSION = 2
 
 
 def root(file):
@@ -97,7 +97,7 @@ def arm_transforms(joints):
     return transforms, targets
 
 
-PACKING = {'PT_Short4N':8,'PT_UByte4':4,'PT_UByte4N':4,'PT_Float16_2':4,'PT_Dec4':4,'PT_Color':4,'PT_Float16_4':8,'PT_Float4':16,'PT_UInt4':16}
+PACKING = {'PT_Short4N':8,'PT_UByte4':4,'PT_UByte4N':4,'PT_Float16_2':4,'PT_Dec4':4,'PT_Color':4,'PT_Float16_4':8,'PT_Float1':4,'PT_Float2':8,'PT_Float3':12,'PT_Float4':16,'PT_UInt4':16}
 
 
 def posed_binary(doc, bind_doc, mask, transforms):

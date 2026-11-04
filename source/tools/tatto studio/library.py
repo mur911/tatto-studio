@@ -1,3 +1,4 @@
+import copy
 """Named tattoo folders, immutable IDs, and atomic project persistence."""
 import base64,hashlib,io,json,math,pathlib,re,secrets,shutil,threading,time,unicodedata
 from PIL import Image
@@ -155,9 +156,50 @@ def design_path(group_id,design_id):
         if json.loads(path.read_text(encoding='utf-8')).get('id')==design_id:return path
     raise ValueError('纹身设计不存在')
 
-def save(group_id,title,project,design_id=None,atlases=None,require_ink=False):
+def render_signature(project):
+    layers=[{k:v for k,v in layer.items() if k!='name'} for layer in project.get('layers',[]) if layer.get('placed') and layer.get('visible') is not False]
+    uses_skin=any(layer.get('blendTarget')=='skin' and layer.get('blendMode','normal')!='normal' for layer in layers)
+    data={'layers':layers,'model':project.get('model',{}).get('id'),'bakeVersion':project.get('bakeVersion'),
+          'bakeResolution':project.get('bakeResolution',2048),'skinStamp':project.get('skinStamp') if uses_skin else None,'includePubic':project.get('includePubic',True)}
+    if any(layer.get('projection')=='warp' for layer in layers):data['warpVersion']=project.get('warpVersion',0)
+    return hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+
+
+def write_changed(path,raw):
+    if path.exists() and path.read_bytes()==raw:return
+    temp=path.with_name(path.name+'.'+secrets.token_hex(4)+'.pending');temp.write_bytes(raw);temp.replace(path)
+
+
+def save(group_id,title,project,design_id=None,atlases=None,require_ink=False,reuse=None):
+    project=copy.deepcopy(project)
+    import design_coverage
+    design_coverage.validate(project)
+    if any('image_ref' in layer for layer in project.get('layers',[])):
+        if not design_id:raise ValueError('Image references require an existing design.')
+        old=load(group_id,design_id);known={}
+        for layer in old.get('layers',[]):
+            encoded=layer.get('image','');raw=base64.b64decode(encoded.split(',',1)[1],validate=True)
+            known[hashlib.sha256(raw).hexdigest()]=encoded
+        for layer in project['layers']:
+            if 'image_ref' not in layer:continue
+            reference=layer.pop('image_ref')
+            if not isinstance(reference,str) or reference not in known or 'image' in layer:raise ValueError('The saved source image could not be verified. Reopen the design and try again.')
+            layer['image']=known[reference]
     validate(project);title=name(title)
-    checked_atlases={};has_ink=False
+    signature=render_signature(project)
+    previous_data={};cache={};has_ink=False
+    if reuse is not None:
+        if not design_id or atlases is not None:raise ValueError('Cached textures are invalid. Bake and save the design again.')
+        previous_path=design_path(group_id,design_id)
+        previous_data=json.loads(previous_path.read_text(encoding='utf-8'))
+        cache=previous_data.get('atlas_cache',{})
+        if not isinstance(reuse,dict) or reuse!=cache or cache.get('signature')!=signature or not cache.get('files'):raise ValueError('Cached textures are invalid. Bake and save the design again.')
+        for key,digest in cache['files'].items():
+            if not re.fullmatch('[a-zA-Z0-9_-]{1,80}',key):raise ValueError('Cached textures are invalid. Bake and save the design again.')
+            path=previous_path.parent/BAKED_TEXTURES_NAME/(key+'.png')
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest()!=digest:raise ValueError('Cached textures are invalid. Bake and save the design again.')
+        has_ink=cache.get('has_ink') is True
+    checked_atlases={}
     for key,png in (atlases or {}).items():
         if not re.fullmatch('[a-zA-Z0-9_-]{1,80}',key):raise ValueError('贴图名称无效')
         if not isinstance(png,str) or not png.startswith('data:image/png;base64,') or len(png)>34*1024*1024:raise ValueError('烘焙贴图无效')
@@ -166,7 +208,7 @@ def save(group_id,title,project,design_id=None,atlases=None,require_ink=False):
             if image.size!=(project.get('bakeResolution',2048),)*2 or image.format!='PNG':raise ValueError('烘焙贴图尺寸与所选输出清晰度不一致')
             has_ink=has_ink or image.convert('RGBA').getchannel('A').getbbox() is not None
         checked_atlases[key]=raw
-    intentional_blank=hidden_only(project) and bool(checked_atlases)
+    intentional_blank=hidden_only(project) and bool(checked_atlases or cache.get('files'))
     if require_ink and not has_ink and not intentional_blank:raise ValueError('「'+title+'」没有图案落在当前模型上，已停止适配且未覆盖该设计')
     draft=not has_ink and not intentional_blank
     with LOCK:
@@ -181,15 +223,22 @@ def save(group_id,title,project,design_id=None,atlases=None,require_ink=False):
         value={**project,'version':4,'id':ident,'title':title,'group_id':group_id,'enabled':enabled,'draft':draft,'updated':time.time()}
         if 'game_option_index' in previous_data:value['game_option_index']=previous_data['game_option_index']
         target.mkdir(exist_ok=True);images=target/SOURCE_IMAGES_NAME;images.mkdir(exist_ok=True)
+        image_refs=[]
         for i,layer in enumerate(value['layers']):
-            raw=base64.b64decode(layer['image'].split(',',1)[1]);(images/f'{i+1:02d}.png').write_bytes(raw)
+            raw=base64.b64decode(layer['image'].split(',',1)[1]);write_changed(images/f'{i+1:02d}.png',raw);image_refs.append(hashlib.sha256(raw).hexdigest())
         if atlases:
             atlas_dir=target/BAKED_TEXTURES_NAME;atlas_dir.mkdir(exist_ok=True)
             for key,raw in checked_atlases.items():
-                (atlas_dir/(key+'.png')).write_bytes(raw)
+                write_changed(atlas_dir/(key+'.png'),raw)
             value['atlas_keys']=list(atlases)
+            cache={'signature':signature,'has_ink':has_ink,'files':{key:hashlib.sha256(raw).hexdigest() for key,raw in checked_atlases.items()}}
+            for old in atlas_dir.glob('*.png'):
+                if old.stem not in checked_atlases:old.unlink()
+        elif reuse is not None:value['atlas_keys']=list(cache['files'])
+        value['atlas_cache']=cache
+        value['image_refs']=image_refs
         atomic(target/'design.tattoo.json',value)
-        return {'id':ident,'group_id':group_id,'title':title,'path':str(target),'draft':draft,'updated':value['updated']}
+        return {'id':ident,'group_id':group_id,'title':title,'path':str(target),'draft':draft,'updated':value['updated'],'cache_token':cache,'image_refs':image_refs}
 
 def load(group_id,design_id):return json.loads(design_path(group_id,design_id).read_text(encoding='utf-8'))
 

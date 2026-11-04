@@ -12,6 +12,7 @@ import time
 import uuid
 import contextlib
 import ctypes
+from render_versions import WARP_VERSION
 from ctypes import wintypes
 
 ROOT = Path(__file__).resolve().parent
@@ -32,7 +33,7 @@ def launch_lock(port):
         raise ctypes.WinError(ctypes.get_last_error())
     acquired = False
     try:
-        acquired = kernel.WaitForSingleObject(handle, 30000) in (0, 0x80)
+        acquired = kernel.WaitForSingleObject(handle, 120000) in (0, 0x80)
         if not acquired:
             raise RuntimeError('Another launch is still in progress. Try again shortly.')
         yield
@@ -66,7 +67,7 @@ def valid_cli(value):
 
 def validate(paths):
     return (valid_game(paths.get('game_directory')) and
-            valid_staging(paths.get('vortex_staging_directory')) and
+            (paths.get('installation_mode') == 'manual' or valid_staging(paths.get('vortex_staging_directory'))) and
             valid_cli(paths.get('wolvenkit_cli')))
 
 
@@ -75,6 +76,8 @@ def resolve_paths(existing, root=ROOT, detected=None):
         from vortex_paths import read_paths
         detected = read_paths(Path(os.environ.get('APPDATA', '')) / 'Vortex/state.v2')
     game = next((str(p) for p in (root, *root.parents) if valid_game(str(p))), None)
+    if valid_game(existing.get('game_directory')):
+        game = str(Path(existing['game_directory']).resolve())
     for value in (existing.get('game_directory'), detected.get('game_directory')):
         if not game and valid_game(value):
             game = str(Path(value).resolve())
@@ -93,14 +96,19 @@ def resolve_paths(existing, root=ROOT, detected=None):
     if game:
         hints += [str(Path(game) / 'tools/WolvenKit-CLI/WolvenKit.CLI.exe')]
     cli = next((str(Path(p).resolve()) for p in hints if valid_cli(p)), None)
-    return {'game_directory': game, 'vortex_staging_directory': staging, 'wolvenkit_cli': cli}
+    return {'game_directory': game, 'vortex_staging_directory': staging, 'wolvenkit_cli': cli, 'installation_mode': existing.get('installation_mode', 'vortex' if staging else 'manual'), 'library_publish_target': existing.get('library_publish_target','')}
 
 
 def save_settings(data, existing, selected):
     if not validate(selected):
         raise ValueError('The selected paths are invalid. Configuration was not changed.')
     value = {'python_executable': 'runtime/python/python.exe', 'generated_package': 'output/tatto_studio_Library.zip', **existing}
-    value.update({key: str(Path(selected[key]).resolve()) for key in ('game_directory', 'vortex_staging_directory', 'wolvenkit_cli')})
+    value.update({key: str(Path(selected[key]).resolve()) if selected.get(key) else None for key in ('game_directory', 'vortex_staging_directory', 'wolvenkit_cli')})
+    value['installation_mode'] = selected.get('installation_mode','vortex')
+    value['library_publish_target'] = str(Path(selected['library_publish_target']).resolve()) if selected.get('library_publish_target') else ''
+    value['library_publish_target_confirmed'] = bool(value['library_publish_target'])
+    value['setup_confirmed_version'] = '1.0.1'
+    value['setup_confirmation_revision'] = 2
     data.mkdir(parents=True, exist_ok=True)
     path = data / 'settings.local.json'
     temporary = path.with_name(path.name + '.' + uuid.uuid4().hex + '.tmp')
@@ -176,7 +184,7 @@ def start_server(port, data):
     info = probe(port)
     version = int(re.search(r'(?m)^VERSION = (\d+)\r?$', (ROOT / 'profiles.py').read_text(encoding='utf-8')).group(1))
     previous_token = None
-    if info and (info.get('overlay_profile_version') != version or info.get('launcher_protocol', 0) < 2):
+    if info and (info.get('overlay_profile_version') != version or info.get('surface_warp_version') != WARP_VERSION or info.get('version') != '1.0.1' or info.get('launcher_protocol', 0) < 3 or info.get('library_publish_mode') != 'editor-mod' or Path(info.get('application_root','')).resolve() != ROOT or Path(info.get('data_directory','')).resolve() != Path(data).resolve()):
         if info.get('launcher_protocol', 0) < 2:
             raise RuntimeError('An older editor service is still running. Close its tabs and wait a few seconds before starting the new version.')
         previous_token = info.get('token')
@@ -195,7 +203,7 @@ def start_server(port, data):
     with log_path.open('ab') as log:
         process = subprocess.Popen([str(python), '-B', str(ROOT / 'server.py'), '--port', str(port)], cwd=ROOT,
                                    stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=environment, close_fds=True)
-    for _ in range(100):
+    for _ in range(800):
         if process.poll() is not None:
             raise RuntimeError('The editor could not start. See ' + str(log_path))
         info = probe(port)
@@ -216,8 +224,7 @@ def main():
     if args.action == 'resolve':
         paths = resolve_paths(existing)
         result = {'paths': paths, 'needs_configuration': not validate(paths)}
-        if validate(paths) and any(existing.get(k) != v for k, v in paths.items()):
-            save_settings(data, existing, paths)
+
     elif args.action == 'save':
         selected = json.load(sys.stdin)
         if not isinstance(selected, dict):
@@ -235,18 +242,30 @@ def main():
                 if not info:
                     existing = read_settings(data)
                     paths = resolve_paths(existing)
-                    if validate(paths) and any(existing.get(k) != v for k, v in paths.items()):
-                        save_settings(data, existing, paths)
+
                 result = start_server(args.port, data)
                 if args.action in ('launch', 'configure'):
                     url = result['url'] + ('/setup.html' if args.action == 'configure' else '/')
                     os.startfile(url)
-    print(json.dumps(result, ensure_ascii=True))
+    if sys.stdout is not None:
+        print(json.dumps(result, ensure_ascii=True))
 
 
 if __name__ == '__main__':
     try:
         main()
     except Exception as error:
-        print(str(error), file=sys.stderr)
+        if sys.stderr is not None:
+            print(str(error), file=sys.stderr)
+        else:
+            import traceback
+            try:
+                from datalocation import data_directory
+                folder=data_directory();folder.mkdir(parents=True,exist_ok=True)
+            except Exception:
+                folder=Path(os.environ.get('TEMP',str(Path.home())))
+            log=folder/'editor-launch.log'
+            with log.open('a',encoding='utf-8') as stream:traceback.print_exc(file=stream)
+            from notifications import show
+            show(error,log)
         sys.exit(1)

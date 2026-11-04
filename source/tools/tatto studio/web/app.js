@@ -1,4 +1,10 @@
-import {prepareWarp,validateWarp} from './surface-warp.mjs';
+import {localizeError} from './api-messages.mjs';
+import {AttributeCache} from './attribute-cache.mjs';
+import {frameTask,framePointer} from './frame-work.mjs';
+import {pickRanges} from './pick-index.mjs';
+import {encodePixelsFallback} from './pixel-fallback.mjs';
+import {encodePixels,resetPixelEncoder} from './pixel-encoder.mjs';
+import {prepareWarp,validateWarp,warpRejectedIndices,WARP_VERSION} from './surface-warp.mjs';
 import {tattooDrawRanges} from './tattoo-regions.mjs';
 import {padAtlasPixels} from './uv-padding.mjs';
 import {LAYER_BATCH_SIZE,layerBatches,PreviewInk} from './layer-stack.mjs';
@@ -21,10 +27,10 @@ const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],add=(a,b)=>a.map((v,i)=>v+b[i]),s
 const imageSources=new WeakMap(),alphaCanvas=document.createElement('canvas');alphaCanvas.width=alphaCanvas.height=1;const alphaContext=alphaCanvas.getContext('2d',{willReadFrequently:true});
 const originalSources=new WeakMap();
 let program,locations={},fbos={},bakeTimer,resizeObserver,blankTexture,skinPreview,liquifyGPU,previewInk;
-const bakeScratch={};
+const bakeScratch={},attributes=new AttributeCache(gl);
 let activeWarp=null;
 const skinDerivatives=!!gl?.getExtension('OES_standard_derivatives');
-function status(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);if(error)document.dispatchEvent(new CustomEvent('tattoo:notice',{detail:{text,error:true}}))}
+function status(text,error=false){if(error)text=localizeError(text);$('status').textContent=text;$('status').classList.toggle('error',error);if(error)document.dispatchEvent(new CustomEvent('tattoo:notice',{detail:{text,error:true}}))}
 function fatal(error){console.error(error);$('fatal').hidden=false;$('fatal').textContent=error.message||String(error);status(error.message||String(error),true);status('编辑器未能启动，请检查提示。',true)}
 function shader(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
 function initGL(){
@@ -39,7 +45,7 @@ function initGL(){
  fs+=`}else{ink=vec4(0.0);}if(bakeMode>0.5||inkOnly>.5){gl_FragColor=ink;}else{if(useAtlas>0.5&&allowInk>.5)ink=texture2D(atlas,vUV);gl_FragColor=vec4(shadeSkinReference(ink,n,cameraPosition),1.0);}}`;
  program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vs));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));gl.useProgram(program);
  for(const name of [...skinUniformNames,'liquifyCounts','cameraPosition','cameraRight','cameraUp','cameraForward','aspect','zoom','bakeMode','useAtlas','atlas','hasPrevious','inkOnly','inkSize','previousInk','currentAtlas',...Array.from({length:LAYER_BATCH_SIZE},(_,i)=>['image','center','right','up','normal','settings','depth','uvAtlas','uvSettings','uvRotation','blendMode','blendTarget','removeWhite','projectionMode','scopeAtlas','wrapMode','repeatCount','projectionShape','metricProjection','cylinderScale','sphereScale','projectorScale','backfaceCulling','placementPose'].map(n=>n+i)).flat()])locations[name]=gl.getUniformLocation(program,name);
- locations.allowInk=gl.getUniformLocation(program,'allowInk');
+ locations.allowInk=gl.getUniformLocation(program,'allowInk');locations.warpSurfaceValid=gl.getUniformLocation(program,'warpSurfaceValid');
  for(const name of ['aWarpUV','aPosition','aNormal','aUV','aRestPosition','aRestNormal','aTPosePosition','aTPoseNormal'])locations[name]=gl.getAttribLocation(program,name);
  gl.uniform1i(locations.atlas,4);gl.uniform1i(locations.previousInk,3);
  for(const part of ['body','left_arm','right_arm']){
@@ -75,8 +81,11 @@ function drawPart(part,segment=null){
  bind(part.vbo,[['aPosition',3,0],['aNormal',3,12],['aUV',2,24]]);
  bind(part.restVbo||part.vbo,[['aRestPosition',3,0],['aRestNormal',3,12]]);
  bind(part.tposeVbo||part.restVbo||part.vbo,[['aTPosePosition',3,0],['aTPoseNormal',3,12]]);
- const warpData=activeWarp?.mapped.get(part);if(warpData){part.warpVbo??=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,part.warpVbo);if(part.warpUpload!==warpData){gl.bufferData(gl.ARRAY_BUFFER,warpData,gl.DYNAMIC_DRAW);part.warpUpload=warpData}gl.enableVertexAttribArray(locations.aWarpUV);gl.vertexAttribPointer(locations.aWarpUV,3,gl.FLOAT,false,12,0)}else{gl.disableVertexAttribArray(locations.aWarpUV);gl.vertexAttrib3f(locations.aWarpUV,0,0,0)}
- gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,part.ibo);gl.drawElements(gl.TRIANGLES,segment?.count??part.indices.length,gl.UNSIGNED_INT,(segment?.first??0)*4);
+ const warpData=activeWarp?.mapped.get(part);if(warpData){attributes.bind(warpData);gl.enableVertexAttribArray(locations.aWarpUV);gl.vertexAttribPointer(locations.aWarpUV,3,gl.FLOAT,false,12,0)}else{gl.disableVertexAttribArray(locations.aWarpUV);gl.vertexAttrib3f(locations.aWarpUV,0,0,0)}
+ gl.uniform1f(locations.warpSurfaceValid,1);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,part.ibo);gl.drawElements(gl.TRIANGLES,segment?.count??part.indices.length,gl.UNSIGNED_INT,(segment?.first??0)*4);
+ // Correct only chart-cut triangles in one cached draw. Re-evaluate the same
+ // batch without its warped stamp, preserving skin and all other layers.
+ const rejected=warpRejectedIndices(activeWarp,part,segment);if(rejected?.length){gl.uniform1f(locations.warpSurfaceValid,0);attributes.bind(rejected,gl.ELEMENT_ARRAY_BUFFER);gl.drawElements(gl.TRIANGLES,rejected.length,gl.UNSIGNED_INT,0);gl.uniform1f(locations.warpSurfaceValid,1)}
 }
 function drawScene(baking=false,atlas=null,useAtlas=false){
  for(const part of state.parts){
@@ -88,8 +97,11 @@ function drawScene(baking=false,atlas=null,useAtlas=false){
   }
  }
 }
-function render(){
+const paint=frameTask(()=>renderNow(),20);
+function render(){paint(true)}
+function renderNow(){
  if(!program||!state.parts.length||!canvas.width||!canvas.height)return;
+ const frameStarted=performance.now();
  const useAtlas=!!(state.baked&&$('bakedPreview')?.checked),batches=useAtlas?[[]]:layerBatches(state.layers);let previous=null;
  gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.depthMask(true);
  if(batches.length>1)previewInk.resize(canvas.width,canvas.height);
@@ -103,6 +115,17 @@ function render(){
   previous=target?.tex||null;
  }
  if(state.onRender)state.onRender();
+ state.lastFrameCPUms=performance.now()-frameStarted;
+}
+function memoryStats(){
+ let gpu=attributes.bytes;
+ for(const p of state.parts){gpu+=p.indices.byteLength+p.vertices.byteLength;if(p.tposeVbo)gpu+=p.tposeVertices.byteLength}
+ for(const texture of new Set(state.layers.map(l=>l.texture))){const source=imageSources.get(texture);if(source)gpu+=(source.naturalWidth||source.width)*(source.naturalHeight||source.height)*4}
+ for(const target of Object.values(fbos))gpu+=(target.size||0)**2*4;
+ if(bakeScratch.tex)gpu+=(bakeScratch.size||0)**2*4;
+ if(previewInk?.targets.length)gpu+=previewInk.width*previewInk.height*8*previewInk.targets.length;
+ gpu+=(liquifyGPU?.entries.size||0)*1024*4*16;
+ return {estimatedKnownGPUBytes:gpu,jsHeapBytes:performance.memory?.usedJSHeapSize??null};
 }
 function resizeAtlas(target,size){resizeTarget(gl,target,size)}
 function bake(resolution=($('bakedPreview')?.checked?state.bakeResolution:2048),onlyAtlas=null,notify=true){
@@ -111,7 +134,7 @@ function bake(resolution=($('bakedPreview')?.checked?state.bakeResolution:2048),
  try{
   for(const [atlas,target]of Object.entries(fbos)){
    if(onlyAtlas!==null&&atlas!==onlyAtlas)continue;
-   resizeAtlas(target,resolution);if(batches.length>1)resizeAtlas(bakeScratch,resolution);let previous=null,lastTarget;
+   resizeAtlas(target,resolution);if(batches.length>1)resizeAtlas(bakeScratch,resolution);state.peakKnownGPUBytes=Math.max(state.peakKnownGPUBytes||0,memoryStats().estimatedKnownGPUBytes);let previous=null,lastTarget;
    for(let i=0;i<batches.length;i++){
     lastTarget=i%2?bakeScratch:target;
     // Read the previous unlit composite before blending the next batch. This
@@ -128,22 +151,40 @@ function bake(resolution=($('bakedPreview')?.checked?state.bakeResolution:2048),
  }
  state.baked=true;state.dirty=false;if(notify){render();if(state.onBake)state.onBake()}
 }
+let imageDocument=null,nextImageKey=0;const imageKeys=new Map();
+function renderKey(p=project(),atlas=null){
+ if(imageDocument!==p.assetId){imageDocument=p.assetId;imageKeys.clear()}
+ const present=new Set(p.layers.map(l=>l.image));for(const image of imageKeys.keys())if(!present.has(image))imageKeys.delete(image);
+ const identity=image=>{if(!imageKeys.has(image))imageKeys.set(image,++nextImageKey);return imageKeys.get(image)};
+ const layers=p.layers.filter(l=>l.visible!==false&&l.placed&&(!atlas||!(l.projection==='uv'?l.uvAtlas:l.targetAtlas)||(l.projection==='uv'?l.uvAtlas:l.targetAtlas)===atlas)).map(({name,image,...rest})=>({...rest,imageKey:identity(image)}));
+ return JSON.stringify({version:p.bakeVersion,warpVersion:layers.some(l=>l.projection==='warp')?p.warpVersion??0:null,resolution:p.bakeResolution,model:p.model?.id,skin:layers.some(l=>l.blendTarget==='skin'&&l.blendMode&&l.blendMode!=='normal')?p.skinStamp:null,includePubic:p.includePubic,layers});
+}
+const encodedAtlases=new Map();let encodedModel=null;
 async function bakePNGs(resolution=state.bakeResolution,progress=()=>{}){
- clearTimeout(bakeTimer);const result={};let done=0;
- // Release the full-resolution inspection cache before exporting one atlas
- // at a time. This changes the view only, never the saved output resolution.
- if($('bakedPreview')?.checked||Object.values(fbos).some(t=>t.size>2048)){
-  if($('bakedPreview'))$('bakedPreview').checked=false;bake(2048);
+ clearTimeout(bakeTimer);const result={};let done=0,bytes=0;
+ if(encodedModel!==state.parts){encodedModel=state.parts;encodedAtlases.clear()}
+ if($('bakedPreview'))$('bakedPreview').checked=false;
+ const captured=project(),keyBefore=renderKey(captured);
+ for(const [key,target]of Object.entries(fbos)){
+  const signature=resolution+':'+renderKey(captured,key),cached=encodedAtlases.get(key);
+  if(cached?.signature===signature){result[key]=cached.png;progress(++done,Object.keys(fbos).length);continue}
+  let c;
+  try{
+   await new Promise(requestAnimationFrame);bake(resolution,key,false);
+   gl.bindFramebuffer(gl.FRAMEBUFFER,target.fbo);const pixels=new Uint8Array(resolution*resolution*4);gl.readPixels(0,0,resolution,resolution,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+   let blob=null;try{blob=await encodePixels(pixels,resolution,state.parts,key)}catch(error){console.warn(error)}
+   if(!blob){gl.bindFramebuffer(gl.FRAMEBUFFER,target.fbo);const retry=new Uint8Array(resolution*resolution*4);gl.readPixels(0,0,resolution,resolution,gl.RGBA,gl.UNSIGNED_BYTE,retry);blob=await encodePixelsFallback(retry,resolution,state.parts,key)}
+   const png=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)});
+   if(renderKey()!==keyBefore)throw new Error('The design changed during encoding. Save again.');
+   result[key]=png;encodedAtlases.set(key,{signature,png});progress(++done,Object.keys(fbos).length);
+  }finally{if(c)c.width=c.height=1;resizeAtlas(target,1)}
  }
- try{for(const [key,target]of Object.entries(fbos)){
-  const restoreSize=target.size||2048;let c;
-  try{bake(resolution,key,false);c=atlasCanvas(target);progress(++done,Object.keys(fbos).length);result[key]=await encodeCanvasPNG(c);}
-  finally{if(c)c.width=c.height=1;if(target.size!==restoreSize)bake(restoreSize,key,false);}
- }}finally{render();if(state.onBake)state.onBake();}
- return result;
+ // Bound encoded PNG retention. The current save owns its result until upload ends.
+ for(const [key,value]of [...encodedAtlases].reverse()){bytes+=value.png.length*2;if(bytes>96*1024*1024)encodedAtlases.delete(key)}
+ state.baked=false;state.dirty=true;render();if(state.onBake)state.onBake();return result;
 }
 
-function changed(){state.dirty=true;state.baked=false;if(state.onChange)state.onChange();render();clearTimeout(bakeTimer);bakeTimer=setTimeout(()=>{try{bake()}catch(e){status(e.message,true)}},180);$('downloads').replaceChildren();}
+function changed(){state.dirty=true;state.baked=false;if(state.onChange)state.onChange();render();clearTimeout(bakeTimer);if($('bakedPreview')?.checked)$('bakedPreview').checked=false;$('downloads').replaceChildren();}
 function resize(){const ratio=Math.min(devicePixelRatio||1,1.7),r=canvas.getBoundingClientRect();canvas.width=Math.round(r.width*ratio);canvas.height=Math.round(r.height*ratio);render()}
 let posePreparation=null;
 async function ensureTPose(){
@@ -184,11 +225,11 @@ function applyPreviewPose(pose,frame=false){
 
 async function loadModel(url='/assets/model.json'){
  const meta=await(await fetch(url)).json();
- for(const p of state.parts){for(const buffer of new Set([p.vbo,p.restVbo,p.tposeVbo,p.warpVbo].filter(Boolean)))gl.deleteBuffer(buffer);gl.deleteBuffer(p.ibo)}state.parts=[];
+ for(const p of state.parts){for(const buffer of new Set([p.vbo,p.restVbo,p.tposeVbo,p.warpVbo].filter(Boolean)))gl.deleteBuffer(buffer);gl.deleteBuffer(p.ibo)}resetPixelEncoder();attributes.clear();liquifyGPU?.clear();state.parts=[];
  for(const f of Object.values(fbos)){gl.deleteFramebuffer(f.fbo);gl.deleteTexture(f.tex)}fbos={};state.atlasIds={};
  for(const [i,key]of [...new Set(meta.parts.map(p=>p.atlas))].entries()){state.atlasIds[key]=i;const tex=texture(null,2048,2048),fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('纹理缓冲创建失败');fbos[key]={tex,fbo,size:2048}}
  for(const item of meta.parts){const response=await fetch(item.url);if(!response.ok)throw new Error('无法读取模型资源');const data=await response.arrayBuffer(),header=new Uint32Array(data,0,2),vertices=new Float32Array(data,8,header[0]*8),indices=new Uint32Array(data,8+header[0]*32,header[1]);const part={...item,vertices,indices,vbo:gl.createBuffer(),ibo:gl.createBuffer()};gl.bindBuffer(gl.ARRAY_BUFFER,part.vbo);gl.bufferData(gl.ARRAY_BUFFER,vertices,gl.STATIC_DRAW);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,part.ibo);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indices,gl.STATIC_DRAW);part.restVertices=vertices;part.restVbo=part.vbo;state.parts.push(part)}
- state.model={id:meta.id||'rb',name:meta.body||'导入角色',exportProfile:meta.exportProfile||(meta.id?'preview-only':'rb-female-v1'),url,poses:meta.poses||{},limitations:meta.limitations||[]};state.previewPose='rest';if($('previewPose'))$('previewPose').value='rest';if(state.layers.some(l=>l.placementPose==='tpose'))await ensureTPose();$('modelStatus').textContent=state.model.name+(state.model.exportProfile==='preview-only'?' / 仅参考预览':state.model.exportProfile==='captured-decal-v1'?' / 实际网格输出 · 待游戏测试':' / 可发布');frameModel();bake();resize();if(state.onModel)state.onModel(meta);await refreshSkin(false,meta)
+ state.model={id:meta.id||'rb',name:meta.body||'导入角色',exportProfile:meta.exportProfile||(meta.id?'preview-only':'rb-female-v1'),url,poses:meta.poses||{},limitations:meta.limitations||[]};state.previewPose='rest';if($('previewPose'))$('previewPose').value='rest';if(state.layers.some(l=>l.placementPose==='tpose'))await ensureTPose();$('modelStatus').textContent=state.model.name+(state.model.exportProfile==='preview-only'?' / 仅参考预览':state.model.exportProfile==='captured-decal-v1'?' / 实际网格输出 · 待游戏测试':' / 可发布');frameModel();bake();resize();if(state.onModel)state.onModel(meta);await refreshSkin(false,meta);document.dispatchEvent(new CustomEvent('tattoo:model-loaded'))
 }
 async function refreshSkin(force=false,meta=state.model){
  const info=$('skinInfo'),issues=$('skinIssues');if(info)info.textContent='正在读取皮肤参考…';
@@ -200,19 +241,22 @@ async function refreshSkin(force=false,meta=state.model){
 function frameModel(){const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];for(const p of state.parts)for(let i=0;i<p.vertices.length;i+=8)for(let k=0;k<3;k++){lo[k]=Math.min(lo[k],p.vertices[i+k]);hi[k]=Math.max(hi[k],p.vertices[i+k])}if(!Number.isFinite(lo[0]))return;const rect=canvas.getBoundingClientRect(),aspect=Math.max(.2,rect.width/Math.max(1,rect.height)),distance=Math.max((hi[2]-lo[2])/2,(hi[0]-lo[0])/2/aspect)/Math.tan(Math.PI*21/180)*1.12;state.camera={az:0,el:.04,distance:Math.max(.2,distance),target:lo.map((v,i)=>(v+hi[i])/2)}}
 function point(v,i){return [v[i*8],v[i*8+1],v[i*8+2]]}
 function pick(x,y){const rect=canvas.getBoundingClientRect(),sx=((x-rect.left)/rect.width*2-1)*(rect.width/rect.height)*Math.tan(Math.PI*21/180),sy=(1-(y-rect.top)/rect.height*2)*Math.tan(Math.PI*21/180),b=cameraBasis(),dir=unit(add(b.forward,add(mul(b.right,sx),mul(b.up,sy))));let nearest=Infinity,hit=null;
- for(const part of state.parts){if(part.visible===false)continue;const v=part.vertices,t=part.indices;for(let j=0;j<t.length;j+=3){const a=point(v,t[j]),bb=point(v,t[j+1]),c=point(v,t[j+2]),e1=sub(bb,a),e2=sub(c,a),p=cross(dir,e2),det=dot(e1,p);if(Math.abs(det)<1e-9)continue;const inv=1/det,s=sub(b.position,a),u=dot(s,p)*inv;if(u<0||u>1)continue;const q=cross(s,e1),w=dot(dir,q)*inv;if(w<0||u+w>1)continue;const distance=dot(e2,q)*inv;if(distance<=0||distance>=nearest)continue;const ns=[t[j],t[j+1],t[j+2]].map(i=>[v[i*8+3],v[i*8+4],v[i*8+5]]);const normal=unit(add(mul(ns[0],1-u-w),add(mul(ns[1],u),mul(ns[2],w))));if(dot(normal,dir)>-.02)continue;const interpolate=(vertices,offset)=>[0,1,2].map(k=>vertices[t[j]*8+offset+k]*(1-u-w)+vertices[t[j+1]*8+offset+k]*u+vertices[t[j+2]*8+offset+k]*w);nearest=distance;hit={partObject:part,triangle:[t[j],t[j+1],t[j+2]],weights:[1-u-w,u,w],restPosition:interpolate(part.restVertices||v,0),restNormal:unit(interpolate(part.restVertices||v,3)),tposePosition:interpolate(part.tposeVertices||part.restVertices||v,0),tposeNormal:unit(interpolate(part.tposeVertices||part.restVertices||v,3)),position:add(b.position,mul(dir,distance)),normal,part:part.name,atlas:part.atlas,uv:[6,7].map(k=>v[t[j]*8+k]*(1-u-w)+v[t[j+1]*8+k]*u+v[t[j+2]*8+k]*w)}}}
+ for(const part of state.parts){if(part.visible===false)continue;const v=part.vertices,t=part.indices;for(const range of pickRanges(part,b.position,dir))for(let j=range.first;j<range.end;j+=3){const a=point(v,t[j]),bb=point(v,t[j+1]),c=point(v,t[j+2]),e1=sub(bb,a),e2=sub(c,a),p=cross(dir,e2),det=dot(e1,p);if(Math.abs(det)<1e-9)continue;const inv=1/det,s=sub(b.position,a),u=dot(s,p)*inv;if(u<0||u>1)continue;const q=cross(s,e1),w=dot(dir,q)*inv;if(w<0||u+w>1)continue;const distance=dot(e2,q)*inv;if(distance<=0||distance>=nearest)continue;const ns=[t[j],t[j+1],t[j+2]].map(i=>[v[i*8+3],v[i*8+4],v[i*8+5]]);const normal=unit(add(mul(ns[0],1-u-w),add(mul(ns[1],u),mul(ns[2],w))));if(dot(normal,dir)>-.02)continue;const interpolate=(vertices,offset)=>[0,1,2].map(k=>vertices[t[j]*8+offset+k]*(1-u-w)+vertices[t[j+1]*8+offset+k]*u+vertices[t[j+2]*8+offset+k]*w);nearest=distance;hit={partObject:part,triangle:[t[j],t[j+1],t[j+2]],weights:[1-u-w,u,w],restPosition:interpolate(part.restVertices||v,0),restNormal:unit(interpolate(part.restVertices||v,3)),tposePosition:interpolate(part.tposeVertices||part.restVertices||v,0),tposeNormal:unit(interpolate(part.tposeVertices||part.restVertices||v,3)),position:add(b.position,mul(dir,distance)),normal,part:part.name,atlas:part.atlas,uv:[6,7].map(k=>v[t[j]*8+k]*(1-u-w)+v[t[j+1]*8+k]*u+v[t[j+2]*8+k]*w)}}}
  return hit;
 }
 let drag=null;
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('pointerdown',e=>{if(state.externalDragging)return;drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,button:e.button,moved:false};canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.lastX,dy=e.clientY-drag.lastY;if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>4)drag.moved=true;if(drag.moved){if(drag.button===2){const b=cameraBasis();state.camera.target=add(state.camera.target,add(mul(b.right,-dx*.0015*state.camera.distance),mul(b.up,dy*.0015*state.camera.distance)))}else{state.camera.az-=dx*.007;state.camera.el=Math.max(-1.35,Math.min(1.35,state.camera.el+dy*.006))}render()}drag.lastX=e.clientX;drag.lastY=e.clientY});
+framePointer(canvas,e=>{if(!drag)return;const dx=e.clientX-drag.lastX,dy=e.clientY-drag.lastY;if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>4)drag.moved=true;if(drag.moved){if(drag.button===2){const b=cameraBasis();state.camera.target=add(state.camera.target,add(mul(b.right,-dx*.0015*state.camera.distance),mul(b.up,dy*.0015*state.camera.distance)))}else{state.camera.az-=dx*.007;state.camera.el=Math.max(-1.35,Math.min(1.35,state.camera.el+dy*.006))}render()}drag.lastX=e.clientX;drag.lastY=e.clientY});
 canvas.addEventListener('pointerup',e=>{if(drag&&!drag.moved&&drag.button===0&&!state.exporting&&!state.externalDragging&&!state.liquifyActive)state.onModelClick?.(pick(e.clientX,e.clientY));drag=null});
 canvas.addEventListener('pointercancel',()=>{drag=null});
 canvas.addEventListener('wheel',e=>{e.preventDefault();state.camera.distance=Math.max(.18,Math.min(5,state.camera.distance*Math.exp(e.deltaY*.001)));render()},{passive:false});
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.camera.az={front:0,back:Math.PI,left:-Math.PI/2,right:Math.PI/2}[b.dataset.view];state.camera.el=.02;render()});
 $('resetCamera').onclick=()=>{frameModel();render()};
-function updateUI(){
+const uiWork=frameTask(()=>updateUINow(),10);
+function updateUI(){uiWork(true)}
+function updateUINow(){
+ if(state.externalDragging){const l=state.layers[state.selected];if(l)for(const key of ['width','height','angle','opacity','depth']){if(document.activeElement!==$(key))$(key).value=l[key];$(key+'Out').textContent=Number(l[key].toFixed(2))+(key==='angle'?'°':key==='opacity'?'%':' cm')}if(state.onUI)state.onUI();return}
  $('layers').replaceChildren();$('empty').hidden=state.layers.length>0;
  state.layers.map((l,i)=>({l,i})).reverse().forEach(({l,i})=>{
   const row=document.createElement('div');row.className='layer'+(i===state.selected?' active':'')+(l.visible===false?' layer-hidden':'');row.dataset.layer=i;row.tabIndex=0;row.setAttribute('role','group');row.setAttribute('aria-label','图层 '+l.name);row.title='上下拖动或拖动手柄排序；拖到模型表面放置';
@@ -239,15 +283,16 @@ $('demo').onclick=async()=>{try{const c=document.createElement('canvas');c.width
 function removeLayer(index){const l=state.layers.splice(index,1)[0];if(!l)return;gl.deleteTexture(l.texture);state.selected=state.selected>index?state.selected-1:Math.min(state.selected,state.layers.length-1);state.handlesVisible=false;updateUI();changed()}
 $('deleteLayer').onclick=()=>removeLayer(state.selected);
 for(const [id,delta]of [['layerDown',-1],['layerUp',1]])$(id).onclick=()=>{const i=state.selected,j=i+delta;if(i<0||j<0||j>=state.layers.length)return;[state.layers[i],state.layers[j]]=[state.layers[j],state.layers[i]];state.selected=j;updateUI();changed()};
-function project(){return {version:4,assetId:state.assetId,bakeVersion:BAKE_VERSION,bakeResolution:state.bakeResolution,skinStamp:state.model.id+':'+(state.skinReference?.created_at??'fallback'),body:state.model.name,model:state.model,includePubic:$('includePubic')?.checked??true,title:$('projectTitle').value,layers:state.layers.map(({texture,...rest})=>rest)}}
+function project(){return {version:4,assetId:state.assetId,bakeVersion:BAKE_VERSION,warpVersion:WARP_VERSION,bakeResolution:state.bakeResolution,skinStamp:state.model.id+':'+(state.skinReference?.created_at??'fallback'),body:state.model.name,model:state.model,includePubic:$('includePubic')?.checked??true,title:$('projectTitle').value,layers:state.layers.map(({texture,...rest})=>rest)}}
 $('importProject').onclick=()=>$('projectFile').click();
 function validateProject(value){if(value.bakeResolution!==undefined&&![2048,4096].includes(value.bakeResolution))throw new Error('输出清晰度无效');if(![1,2,3,4].includes(value.version)||!Array.isArray(value.layers))throw new Error('不是受支持的 RB 纹身设计文件');for(const l of value.layers){validateLiquify(l.liquify);validateWarp(l.warp);if(l.placementPose!==undefined&&!['rest','tpose'].includes(l.placementPose))throw new Error('图层姿势参数无效');for(const flag of ['visible','backfaceCulling','surfaceFollow'])if(l[flag]!==undefined&&typeof l[flag]!=='boolean')throw new Error('图层开关参数无效');for(const key of ['cylinderScale','sphereScale','projectionScale'])if(l[key]!==undefined&&(!Array.isArray(l[key])||l[key].length!==(key==='projectionScale'?3:2)||!l[key].every(v=>Number.isFinite(v)&&v>=.001&&v<=1000)))throw new Error('图案缩放参数无效');if(l.blur!==undefined)blurValue(l.blur);if(l.blendTarget!==undefined&&!['skin','layers'].includes(l.blendTarget))throw new Error('混合对象无效');if(l.blendMode!==undefined&&!Object.hasOwn(blendModes,l.blendMode))throw new Error('图层混合模式无效');if(l.removeWhite!==undefined&&typeof l.removeWhite!=='boolean')throw new Error('去白底设置无效');for(const key of ['width','height','angle','opacity','depth'])if(!Number.isFinite(l[key]))throw new Error('设计参数无效');if(l.width<.1||l.width>100||l.height<.1||l.height>100||l.depth<.1||l.opacity<0||l.opacity>100||Math.abs(l.angle)>180)throw new Error('设计参数超出范围');for(const key of ['center','normal','right','up'])if(!Array.isArray(l[key])||l[key].length!==3||!l[key].every(v=>Number.isFinite(v)&&Math.abs(v)<=20))throw new Error('设计位置无效');if(typeof l.name!=='string'||typeof l.image!=='string')throw new Error('设计图片无效')}return value}
 $('projectFile').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>80*1024*1024)throw new Error('设计文件过大');const p=validateProject(JSON.parse(await file.text()));state.bakeResolution=p.bakeResolution??2048;await Promise.all(p.layers.map(l=>loadImage(l.image)));state.layers.forEach(l=>gl.deleteTexture(l.texture));state.layers=[];for(const l of p.layers)await addImage(l.image,l.name,l);$('projectTitle').value=String(p.title||'我的 DIY 纹身');state.selected=state.layers.length-1;updateUI();changed();status('设计已恢复，可继续调整。')}catch(e){status(e.message,true)}finally{$('projectFile').value=''}};
 function atlasCanvas(target){const size=target.size;gl.bindFramebuffer(gl.FRAMEBUFFER,target.fbo);const pixels=new Uint8Array(size*size*4);gl.readPixels(0,0,size,size,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const c=document.createElement('canvas');c.width=c.height=size;const ctx=c.getContext('2d'),data=ctx.createImageData(size,size);for(let y=0;y<size;y++)data.data.set(pixels.subarray(y*size*4,(y+1)*size*4),(size-1-y)*size*4);const atlas=Object.keys(fbos).find(key=>fbos[key]===target);if(atlas)padAtlasPixels(data.data,size,state.parts,atlas);ctx.putImageData(data,0,0);return c}
 function atlasPNG(target){return atlasCanvas(target).toDataURL('image/png')}
 async function encodeCanvasPNG(c){const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw new Error('纹理编码失败');return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob)})}
-async function atlasPNGAsync(target){return encodeCanvasPNG(atlasCanvas(target))}
+async function atlasPNGAsync(target){const size=target.size,parts=state.parts;gl.bindFramebuffer(gl.FRAMEBUFFER,target.fbo);const pixels=new Uint8Array(size*size*4);gl.readPixels(0,0,size,size,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const atlas=Object.keys(fbos).find(key=>fbos[key]===target),blob=await encodePixelsFallback(pixels,size,parts,atlas);return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob)})}
 async function boot(){try{initGL();state.config=await(await fetch('/api/config')).json();await loadModel();resizeObserver=new ResizeObserver(resize);resizeObserver.observe(canvas);updateUI();status(state.config.ready?'带入图片，再从图层列表拖到模型表面放置。':'模板正在准备中，请稍后刷新。')}catch(e){fatal(e)}}
-export {state,gl,fbos,$,canvas,add,sub,mul,dot,cross,unit,cameraBasis,render,bake,bakePNGs,changed,resize,loadModel,refreshSkin,loadImage,addImage,project,validateProject,updateUI,status,texture,layerTexture,setLayerBlur,pick,atlasPNG,atlasPNGAsync,atlasCanvas,encodeCanvasPNG,textureAlpha,ensureTPose,applyPreviewPose};
+export {memoryStats,renderKey,state,gl,fbos,$,canvas,add,sub,mul,dot,cross,unit,cameraBasis,render,bake,bakePNGs,changed,resize,loadModel,refreshSkin,loadImage,addImage,project,validateProject,updateUI,status,texture,layerTexture,setLayerBlur,pick,atlasPNG,atlasPNGAsync,atlasCanvas,encodeCanvasPNG,textureAlpha,ensureTPose,applyPreviewPose};
 export function setPreviewSkinCalibration(value){skinPreview?.setCalibration(value);render()}
 export const ready=boot();
+

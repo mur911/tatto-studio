@@ -1,49 +1,61 @@
-# Security review notes — Tatto Studio 1.0.0
+# Security review notes: Tatto Studio 1.0.1
 
-## Startup and local access
+## Entry points and executable dependencies
 
-`Start tatto studio.cmd` runs the bundled `runtime/python/python.exe` with `launcher.py launch`.
-The launcher detects configured paths, starts the backend using the bundled `pythonw.exe`, and opens
-`http://127.0.0.1:8876/` using the default browser. A named Windows mutex serializes simultaneous launches.
-The helper refuses to reuse or stop a service belonging to another installation directory.
+`Start tatto studio.cmd` uses a plain Windows `start` command to invoke the bundled
+`runtime/python/pythonw.exe -B launcher.py launch`. Configure and Stop are separate readable CMD entry points.
+There is no custom packed launcher EXE, encoded command, PowerShell/VBS launcher, automatic dependency
+download, autorun registration or administrator-elevation request in these entry points.
 
-The HTTP server binds only to IPv4 loopback. Requests validate the Host header. POST operations also
-require a per-process session token and reject an explicit foreign Origin. These controls are not a
-security boundary against other programs already running as the same Windows user.
+The distribution is **not executable-free**. It contains CPython, NumPy, Pillow and their native dependencies.
+[BINARY-DEPENDENCIES.json](BINARY-DEPENDENCIES.json) lists every MZ-header file with its release hash;
+[THIRD-PARTY.md](THIRD-PARTY.md) links to upstream sources and licensing references.
 
-The setup page supports auto-detection, manually entered paths, and Windows path dialogs through ctypes.
-There is no custom packed EXE, PowerShell startup, encoded command, elevated-permission request,
-autorun registration, or automatic software download in this release's launcher.
+## Local browser service
 
-## Files and processes
+The Python server binds to IPv4 loopback, normally `127.0.0.1:8876`. It validates Host headers and
+requires a process token for mutations, rejecting explicit foreign Origins. It opens the local editor
+in the default browser. These checks are not a boundary against other programs running as the same user.
 
-- Vortex state is read to locate the game and staging folder.
-- User settings, designs, images, snapshots converted for preview, logs, and exports are written to an
-  independent `tatto studio User Data` folder. Vortex installations use the staging folder's parent.
-  Manual-install fallback is the user's Local AppData. An explicit external data-directory override is supported.
-- The collector writes runtime snapshot JSON files in its game-side mod directory.
-- Reading character resources and exporting tattoo mods runs the user's selected `WolvenKit.CLI.exe`.
-- Publishing updates generated tattoo-library files in matching Vortex staging targets. Deployment remains a user action.
-- The texture codec is loaded from the user's installed game. `native_compression.py` may copy the game's
-  `oo2ext_7_win64.dll` to Local AppData for WolvenKit compatibility. The proprietary DLL is not redistributed here.
-- Native windows are used for file/folder selection. Other processes are not injected into.
+A Windows mutex serializes launch requests. Service reuse checks its application and data directories.
+Browser sessions use a local authenticated event stream; the service exits after the last session closes
+and active work finishes. The Stop launcher requests graceful shutdown, refusing to interrupt active tasks.
 
-Browser sessions hold an authenticated local event-stream connection. The backend exits after the
-last session disconnects and the grace period expires, once active work is finished. A startup timeout
-also stops an unused service. `Stop tatto studio.cmd` uses authenticated graceful shutdown and refuses
-to interrupt active editing requests or background jobs.
+## Files, paths and subprocesses
 
-## Third-party executables
+- Vortex state and deployment metadata are read to find the game, staging folder and publishing target.
+  The editor does not modify the Vortex database.
+- First launch/upgrade asks the user to confirm prefilled paths. Path Settings can change the game,
+  CLI, personal data and publishing locations. Manual installation does not require Vortex.
+- Personal designs, imported images, local model caches, logs and generated output are stored outside
+  the managed editor folder. The default Vortex location is beside the staging root; manual installation
+  has a Local AppData fallback. Locator/preferences files are also stored under the current user's Local AppData.
+- Moving personal data copies and verifies it before switching the locator and restarting the local backend.
+  The source is retained; non-empty destinations are not silently merged. Restart recovery can restore the prior location.
+- Character import and resource generation invoke the user-selected `WolvenKit.CLI.exe`. `processes.py`
+  applies `CREATE_NO_WINDOW` to resource subprocesses to suppress repeated console pop-ups; diagnostic logs remain available.
+- The game's installed texture codec is loaded for compression/verification. `native_compression.py` may
+  copy the user's game DLL to Local AppData for WolvenKit compatibility. This proprietary DLL is not distributed here.
+- The CET collector and redscript bridge run through separately installed mod frameworks to read character
+  component/resource references; the collector writes snapshot JSON in its game-side mod directory.
+- Publishing validates source resources and writes generated library files into the same editor mod's
+  confirmed Vortex staging target. Vortex deployment remains a user action. Manual mode writes to its selected game target.
+- A generated library ZIP is an output/backup, not a second required Vortex installation.
 
-The distribution still includes the Python interpreter, native Python extension modules and dependencies.
-Removing the custom launcher does not make the archive free of Windows executable code.
-[BINARY-DEPENDENCIES.json](BINARY-DEPENDENCIES.json) enumerates every MZ-header file and its hash in
-the exact matching archive. Official upstream references are in [THIRD-PARTY.md](THIRD-PARTY.md).
+## Changes relevant to review
+
+Compared with 1.0.0, this version adds male-body handling and resource-identity checks, localized messages,
+path migration/recovery, file/resource caches, browser Workers for pixel processing, and hidden resource subprocesses.
+Readable sources for these behaviors, including the message catalog, are mapped to the exact distribution.
+
+The release is a standard unencrypted deflated ZIP. [PACKAGE-AUDIT.json](PACKAGE-AUDIT.json) records the
+structure check and whether any valid ZIP archives were found inside it. These findings do not identify
+which Nexus check triggered quarantine, and VirusTotal results do not replace a platform review.
 
 ## Reproduction limits
 
-The editor and collector code are interpreted; no custom launcher compilation is required.
-Game-specific resource templates, branding, and binary dependencies are omitted from this repository.
-The reconstruction script intentionally takes the matching published ZIP as its resource input,
-then overlays the reviewed source and rebuilds the ZIP. It does not independently build CPython,
-NumPy, Pillow, or game assets from source.
+The application's own code is interpreted; no custom EXE compilation is needed. The `.reds` bridge is
+compiled at game startup by the separately installed redscript framework. Reconstruction uses the exact
+submitted ZIP as the input for omitted runtime binaries, branding and resource templates. It is not an
+independent source build of CPython, NumPy, Pillow or game assets. Source verification and reconstruction
+require only Python's standard library and do not launch the game, editor or WolvenKit.

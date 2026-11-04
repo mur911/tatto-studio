@@ -7,12 +7,12 @@ PICKER_LOCK = threading.Lock()
 
 
 def choose(field):
-    if field not in ('game_directory', 'vortex_staging_directory', 'wolvenkit_cli'):
+    if field not in ('game_directory', 'vortex_staging_directory', 'wolvenkit_cli', 'data_directory', 'library_publish_target'):
         raise ValueError('Unknown path field.')
     if not PICKER_LOCK.acquire(blocking=False):
         raise ValueError('A path selection window is already open.')
     try:
-        if field == 'vortex_staging_directory':
+        if field in ('vortex_staging_directory', 'data_directory', 'library_publish_target'):
             return choose_folder()
         filename = 'Cyberpunk2077.exe' if field == 'game_directory' else 'WolvenKit.CLI.exe'
         value = choose_file(filename)
@@ -43,7 +43,7 @@ def choose_file(filename):
     options.lpstrFile = ctypes.cast(buffer, W.LPWSTR)
     options.nMaxFile = len(buffer)
     options.lpstrFilter = filename + '\0' + filename + '\0\0'
-    options.lpstrTitle = 'Tatto Studio - Select ' + filename
+    options.lpstrTitle = 'Tatto Studio - ' + filename
     options.Flags = 0x1000 | 0x800 | 0x8 | 0x2000000  # Existing file/path; no cwd/history changes.
     dialog = ctypes.WinDLL('comdlg32')
     dialog.GetOpenFileNameW.argtypes = [ctypes.POINTER(OPENFILENAMEW)]
@@ -75,7 +75,7 @@ def choose_folder():
         display = ctypes.create_unicode_buffer(32768)
         options = BROWSEINFOW()
         options.pszDisplayName = ctypes.cast(display, W.LPWSTR)
-        options.lpszTitle = 'Tatto Studio - Select the Vortex Cyberpunk 2077 staging folder'
+        options.lpszTitle = 'Tatto Studio'
         options.ulFlags = 0x1 | 0x40 | 0x200  # Filesystem directories; modern UI; no new-folder button.
         pointer = shell.SHBrowseForFolderW(ctypes.byref(options))
         if not pointer:

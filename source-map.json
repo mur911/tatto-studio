@@ -1,16 +1,27 @@
 {
-  "release": "Tatto Studio 1.0.0.zip",
-  "release_sha256": "16e54bc53006c38bc5a9b5a196dc049be8ce2c6f0bc8f30231456e7c68dd9438",
+  "release": "Tatto Studio 1.0.1.zip",
+  "version": "1.0.1",
+  "release_sha256": "b3b090532721b7a3b8b7762bfad79cf4d8247bc0a7850124d299f3bee125ce15",
   "files": [
     {
       "repository_path": "source/bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/init.lua",
       "release_path": "bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/init.lua",
-      "sha256": "8e57ec48d39452113f76f2f3b26faf30986021f49546ab6d509d1749b78b63cf"
+      "sha256": "68379f98077b9c846f9a1bfa523049c0a43b8e4ec8073e2502234c899b804df3"
     },
     {
       "repository_path": "source/bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/libs/Ref.lua",
       "release_path": "bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/libs/Ref.lua",
       "sha256": "39914b0489a279137feb0134f85503551d32fbb5d47871c7a494d28fdeef4d63"
+    },
+    {
+      "repository_path": "source/fomod/ModuleConfig.xml",
+      "release_path": "fomod/ModuleConfig.xml",
+      "sha256": "55345bcb34bef75fdcc1aefbeaed835129290dfe3b5d654fa02a78caa7ce5a33"
+    },
+    {
+      "repository_path": "source/fomod/info.xml",
+      "release_path": "fomod/info.xml",
+      "sha256": "6cdcbe58990eed60b51b9e41e8e6c7f2ba8773e41cc4aaacf8421c6244203b1d"
     },
     {
       "repository_path": "source/licenses/tatto studio/ArchiveXL-MIT.txt",
@@ -25,27 +36,37 @@
     {
       "repository_path": "source/r6/scripts/TattoStudioSnapshot/ResourceBridge.reds",
       "release_path": "r6/scripts/TattoStudioSnapshot/ResourceBridge.reds",
-      "sha256": "c3c925ef11c024fc9bff9996ab8ceb7edd43a01665b8d6ffca3f418cbe641251"
+      "sha256": "e91189b818a2a90993639f9cc3448fcc2e91e86068166127ac4912155912fa30"
     },
     {
       "repository_path": "source/tools/tatto studio/Configure tatto studio.cmd",
       "release_path": "tools/tatto studio/Configure tatto studio.cmd",
-      "sha256": "87503d1d540e67ecac725fd1cfd1ec098014f730989ec1440edd196e33561b22"
+      "sha256": "8c22ce99d73c1686c80c56eb0117aa8dbb375276e27f7d35d9d140c6e8fc1ca4"
     },
     {
       "repository_path": "source/tools/tatto studio/Start tatto studio.cmd",
       "release_path": "tools/tatto studio/Start tatto studio.cmd",
-      "sha256": "d5b2a8858da21c9e173a556410a1f4bcd4e2e77ac0539689504f6afed67b44ac"
+      "sha256": "8e553f141834b0a1d79ffa1004df02e4c6420392f4e7ff4be53604d1db6695e3"
     },
     {
       "repository_path": "source/tools/tatto studio/Stop tatto studio.cmd",
       "release_path": "tools/tatto studio/Stop tatto studio.cmd",
-      "sha256": "3a0d977fa552acecae64fb9348211e4f4371edb9712b2cd8b2bcf8773435f579"
+      "sha256": "ec493ea17227daae16856e10ea6d9aa5caa623744276de9331f7847650c5a4d2"
     },
     {
       "repository_path": "source/tools/tatto studio/archive_order.py",
       "release_path": "tools/tatto studio/archive_order.py",
       "sha256": "54257c7942cb0b73015b7d67db8b80efa3264304de8a09965d77c678937691f9"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/body_profile.py",
+      "release_path": "tools/tatto studio/body_profile.py",
+      "sha256": "14df95d462f8757d442d783ee4c3d46460689cbcc7beabb08515d4af2c49af14"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/captured_rigs.py",
+      "release_path": "tools/tatto studio/captured_rigs.py",
+      "sha256": "e933cbe6616daa74d34160a6cacdbfedd71ec0e5eaa6619f268e8bb1cf971bf7"
     },
     {
       "repository_path": "source/tools/tatto studio/collector/package/RedHotTools-Ref-LICENSE.txt",
@@ -55,7 +76,7 @@
     {
       "repository_path": "source/tools/tatto studio/collector/package/bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/init.lua",
       "release_path": "tools/tatto studio/collector/package/bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/init.lua",
-      "sha256": "8e57ec48d39452113f76f2f3b26faf30986021f49546ab6d509d1749b78b63cf"
+      "sha256": "68379f98077b9c846f9a1bfa523049c0a43b8e4ec8073e2502234c899b804df3"
     },
     {
       "repository_path": "source/tools/tatto studio/collector/package/bin/x64/plugins/cyber_engine_tweaks/mods/TattoStudio_Tattoo_Collector/libs/Ref.lua",
@@ -65,12 +86,27 @@
     {
       "repository_path": "source/tools/tatto studio/collector/package/r6/scripts/TattoStudioSnapshot/ResourceBridge.reds",
       "release_path": "tools/tatto studio/collector/package/r6/scripts/TattoStudioSnapshot/ResourceBridge.reds",
-      "sha256": "c3c925ef11c024fc9bff9996ab8ceb7edd43a01665b8d6ffca3f418cbe641251"
+      "sha256": "e91189b818a2a90993639f9cc3448fcc2e91e86068166127ac4912155912fa30"
     },
     {
       "repository_path": "source/tools/tatto studio/datalocation.py",
       "release_path": "tools/tatto studio/datalocation.py",
-      "sha256": "26ca8115daefa99e55e6d980d53e68fd9549ff47e3282ad808e3e1f58dbb7003"
+      "sha256": "33e9e85e36ebe3704ca9dedd16fefd29deb4c1fb52d5314fd68ae690ed0ac1dc"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/deformation_check.py",
+      "release_path": "tools/tatto studio/deformation_check.py",
+      "sha256": "3451c51bf61070e7886d206ff612bc8fc888dcc2d9d11a471d1a340b037771b9"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/design_coverage.py",
+      "release_path": "tools/tatto studio/design_coverage.py",
+      "sha256": "ca470cd982ef589f1b1ab71d5ba7575c29d374981535d70e45eab676025e7af4"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/head_decal.py",
+      "release_path": "tools/tatto studio/head_decal.py",
+      "sha256": "678d5afe1a630beddc0071d5d10e34097528607382a3af65fd1d2e11a24cf3b2"
     },
     {
       "repository_path": "source/tools/tatto studio/image_input.py",
@@ -80,12 +116,12 @@
     {
       "repository_path": "source/tools/tatto studio/launcher.py",
       "release_path": "tools/tatto studio/launcher.py",
-      "sha256": "d95509fac3e41214f90c0f5480e2d3f12ab8ba0960722b8ef52de3a20bd64172"
+      "sha256": "b5529a20dc3dd8caf7a8e8da0a0607e2c44611d26ea395ef51a386349a0102d6"
     },
     {
       "repository_path": "source/tools/tatto studio/library.py",
       "release_path": "tools/tatto studio/library.py",
-      "sha256": "68c39c22f4c74b51769098cf701021b5438ce557ed8af27e93ef72abfbc2767c"
+      "sha256": "d1a5b8a45f2270c4054905c8183f91080309280d6924f2a2c9112ca520dacf37"
     },
     {
       "repository_path": "source/tools/tatto studio/licenses/ArchiveXL-MIT.txt",
@@ -98,14 +134,24 @@
       "sha256": "57c30d822bb3e54cc894c592232094e7d1a1f6ffe8e0f96c2c0018c4a678886b"
     },
     {
+      "repository_path": "source/tools/tatto studio/messages.json",
+      "release_path": "tools/tatto studio/messages.json",
+      "sha256": "f9bece530ab9eac3ee4228f5dcb47b1c6bc53d3feda72b2ecc55ec972035090c"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/messages.py",
+      "release_path": "tools/tatto studio/messages.py",
+      "sha256": "918f65586e8a03825e7d2d1c846b422927e713ad7eceb855f31355418b77a5b8"
+    },
+    {
       "repository_path": "source/tools/tatto studio/model_pose.py",
       "release_path": "tools/tatto studio/model_pose.py",
-      "sha256": "9dfcc57211954299b6e64a09e388242c799e2bd919c24acf9ab48870862dc044"
+      "sha256": "f94e57fad1c0ef59554dc19f154e7850bc4ab0b3c0f865a93ed3bdc0b21a152d"
     },
     {
       "repository_path": "source/tools/tatto studio/models.py",
       "release_path": "tools/tatto studio/models.py",
-      "sha256": "26a02e59d9cfb5ffcfda8812086324d3dd94c9445dd2a33ff335ee26a5b5e46a"
+      "sha256": "099a955ef22dd21c585d718ee0ef60a67698b4da09b89e2c8db75fb7ac5f7984"
     },
     {
       "repository_path": "source/tools/tatto studio/native_compression.py",
@@ -113,19 +159,59 @@
       "sha256": "5bf786e3a1afa0dbffd3ab8cc8dd3eb04bef92c8dd94f52bfd61976ead6d2d24"
     },
     {
+      "repository_path": "source/tools/tatto studio/notifications.py",
+      "release_path": "tools/tatto studio/notifications.py",
+      "sha256": "f0e2ab90484f9e6c445b5caadcc823542849fd78cb05ca7abb06c78837ad2cc6"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/processes.py",
+      "release_path": "tools/tatto studio/processes.py",
+      "sha256": "12329420feb5beb20f3d129ccea9c94faaa79c251275d82fed5815a7b73f56fb"
+    },
+    {
       "repository_path": "source/tools/tatto studio/profiles.py",
       "release_path": "tools/tatto studio/profiles.py",
-      "sha256": "07b332022b84e108ca1c33d8a54748862788326aecab1335d27df8b2ca13e2b7"
+      "sha256": "7709af0e91ca1139e7ee72ed40f38b64ef4343ea174e28cbfafc37659c52ac2f"
     },
     {
       "repository_path": "source/tools/tatto studio/publisher.py",
       "release_path": "tools/tatto studio/publisher.py",
-      "sha256": "f3c7123b1f8ff415da760932072cf6df21a731e5088b6d55c749f476994d3d7c"
+      "sha256": "66bde38508ab7be963bdf324f05525c721ee42e5d276baf1e82e8a9fcbf1e6ff"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/publishstate.py",
+      "release_path": "tools/tatto studio/publishstate.py",
+      "sha256": "11c323f1a6f083261adecdf336c3a0e5395a2544420541b2611b2082049fc79e"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/release.json",
+      "release_path": "tools/tatto studio/release.json",
+      "sha256": "c892a294636867d31f817906b82081b87ec13449c6837b93f02539105cb845f1"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/relocation.py",
+      "release_path": "tools/tatto studio/relocation.py",
+      "sha256": "109229cd5c32b03bda76f9e69b142fa6a8ea0afb19e0e08c908a83160b98968f"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/render_versions.py",
+      "release_path": "tools/tatto studio/render_versions.py",
+      "sha256": "e63ed802e7d8d022731a8c73ae8f03c49be974e34806c6888025ffff8ec8c8c6"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/resource_session.py",
+      "release_path": "tools/tatto studio/resource_session.py",
+      "sha256": "93ad8826086f1ec9c51b625420e888f04d95579da6f557928fb0f40aeee968b4"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/restart_service.py",
+      "release_path": "tools/tatto studio/restart_service.py",
+      "sha256": "4f47fccab9509de0c2f39dac249490051c6c2743c07ede0d14ef1ec3441a13e2"
     },
     {
       "repository_path": "source/tools/tatto studio/server.py",
       "release_path": "tools/tatto studio/server.py",
-      "sha256": "a43b3d5acfd3c9b0c6315592cb85cfff17334c827a1eebe9550397c69e54a085"
+      "sha256": "4339731032321962c553d7a4bd16d997f1ba6d82c3209aa32994c1e0364bb55a"
     },
     {
       "repository_path": "source/tools/tatto studio/settings.py",
@@ -135,12 +221,17 @@
     {
       "repository_path": "source/tools/tatto studio/skins.py",
       "release_path": "tools/tatto studio/skins.py",
-      "sha256": "3a43c111092f9a3f70c9c6f63724d4f82bce0649444d7193b8fb9ee0f11d84dd"
+      "sha256": "e64209c0587cbd8cb400b69c9089630b640ad27d3f591707dcf3ee0d5097101e"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/snapshot_identity.py",
+      "release_path": "tools/tatto studio/snapshot_identity.py",
+      "sha256": "c037d12a802b31a6c69e0ac34cdd08566aac8076a4e8b358fce160721776de89"
     },
     {
       "repository_path": "source/tools/tatto studio/standalone.py",
       "release_path": "tools/tatto studio/standalone.py",
-      "sha256": "05fe2c16f0bbe2169855ab862c51cd218267be530e88cb93a3bbcd26b3526be9"
+      "sha256": "19919523a6515b065ea1ceb55b8c55cb16da9c3afe0b1d3816f4845a17e2dc44"
     },
     {
       "repository_path": "source/tools/tatto studio/storage_paths.py",
@@ -150,7 +241,7 @@
     {
       "repository_path": "source/tools/tatto studio/tattoo_regions.py",
       "release_path": "tools/tatto studio/tattoo_regions.py",
-      "sha256": "9f043ce6b5b647143b957decde0bb3d0e361b81ded4e1868be08ca51dfe1f234"
+      "sha256": "d370dfecae35750825c1a2ffa90d5936f0d7d2a2b732e3fa13f9fbbee70f1a8f"
     },
     {
       "repository_path": "source/tools/tatto studio/texture_padding.py",
@@ -165,7 +256,7 @@
     {
       "repository_path": "source/tools/tatto studio/userdata.py",
       "release_path": "tools/tatto studio/userdata.py",
-      "sha256": "3dcc665172ccd9ebe1eb5f38b1eba4eed0e4a5c95df16e818669acbf8d737ba8"
+      "sha256": "4f5ce6405cc56e70f70b07a1c2b94aaae90c6fc1bad94772ac8eb5e858bbfcc1"
     },
     {
       "repository_path": "source/tools/tatto studio/vortex_paths.py",
@@ -173,9 +264,19 @@
       "sha256": "15df27e20e3d516c25090b21a475bae8b1ce33457f32ceefc8162ae485d2ba93"
     },
     {
+      "repository_path": "source/tools/tatto studio/web/api-messages.mjs",
+      "release_path": "tools/tatto studio/web/api-messages.mjs",
+      "sha256": "efd12002db9aea73117698f9e587e4c36f5e52f59b0372d41a774544d603f1c5"
+    },
+    {
       "repository_path": "source/tools/tatto studio/web/app.js",
       "release_path": "tools/tatto studio/web/app.js",
-      "sha256": "b3a37f4287e826cb4c40940e5bbbae7a062c179cbe29bfce0dfb2bc014c1964b"
+      "sha256": "250ee8bbeeda3f661e8fd8ed522bafb4bb4d02dab07bca70055bae610eb10b86"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/attribute-cache.mjs",
+      "release_path": "tools/tatto studio/web/attribute-cache.mjs",
+      "sha256": "11a9bd4b118f9b99e643325940be82c9d740aff7a65f0cadd10c6d227f03aec9"
     },
     {
       "repository_path": "source/tools/tatto studio/web/blend.mjs",
@@ -188,9 +289,19 @@
       "sha256": "15e3f8992af8dfcce485931f3fda9c6dfe8e1e8f8a1eb7fe39c839232183254b"
     },
     {
+      "repository_path": "source/tools/tatto studio/web/design-model.mjs",
+      "release_path": "tools/tatto studio/web/design-model.mjs",
+      "sha256": "8774737b3b875588636e094bf4b16bbf956c03e53d77012e3abaa7d44cf2b772"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/frame-work.mjs",
+      "release_path": "tools/tatto studio/web/frame-work.mjs",
+      "sha256": "1ba8c7c65232dc2ccf99c3908e9b4c8dc30c7b8cfd8bb66348d409d16ced9adf"
+    },
+    {
       "repository_path": "source/tools/tatto studio/web/gizmo.mjs",
       "release_path": "tools/tatto studio/web/gizmo.mjs",
-      "sha256": "5d4d37ea1e2743eebf2dc7fecc01ca134cd347f9bdc1d4408ec80d902c971f98"
+      "sha256": "4e83daad1e8a720d58e4b8e7f433394c3b4908d7d64e60e33c23abccbf62bb0c"
     },
     {
       "repository_path": "source/tools/tatto studio/web/gl-target.mjs",
@@ -210,7 +321,7 @@
     {
       "repository_path": "source/tools/tatto studio/web/i18n.mjs",
       "release_path": "tools/tatto studio/web/i18n.mjs",
-      "sha256": "af4b1236d2169f2aaa8f11ca5cab4f1dee0e9c02c3b6e069ff428acdba0288bf"
+      "sha256": "643b63d8f631af7ad6f9baa6090c3ebd96658db2fd710ea953cc99b111b16827"
     },
     {
       "repository_path": "source/tools/tatto studio/web/image-input.mjs",
@@ -235,7 +346,7 @@
     {
       "repository_path": "source/tools/tatto studio/web/library-ui.mjs",
       "release_path": "tools/tatto studio/web/library-ui.mjs",
-      "sha256": "d7be5c2606d406ee7f0bd6f38738aaaa6a5a02532c7aabf38b42c3da2c952ad2"
+      "sha256": "81aaa966f69a8511f4f8c6340ac6d558b6b277ff277749ec99a6896d307025dd"
     },
     {
       "repository_path": "source/tools/tatto studio/web/lifecycle.mjs",
@@ -245,12 +356,12 @@
     {
       "repository_path": "source/tools/tatto studio/web/liquify-gpu.mjs",
       "release_path": "tools/tatto studio/web/liquify-gpu.mjs",
-      "sha256": "ff987bd7d6bc87b18fc15c1cee692a99c4993b0fc55f6a0459da8f2ed247d337"
+      "sha256": "ed73c12de4c51d7db5b3c0ffae2c76f6af031a6c3ce2daec4d4725bb4c7d2973"
     },
     {
       "repository_path": "source/tools/tatto studio/web/liquify-math.mjs",
       "release_path": "tools/tatto studio/web/liquify-math.mjs",
-      "sha256": "e0b16547b88e7ccd7b54e8cf4b38626a35e7403108e128f8599ae6456d7bca30"
+      "sha256": "9eaafe17d94dae07ff20feb634201777661d67075c421a198d767b12182e0fdf"
     },
     {
       "repository_path": "source/tools/tatto studio/web/liquify-ui.mjs",
@@ -270,12 +381,12 @@
     {
       "repository_path": "source/tools/tatto studio/web/locales.mjs",
       "release_path": "tools/tatto studio/web/locales.mjs",
-      "sha256": "2cf6da03c46ab196df1d6570900267ae3276edaae7db9d2067d8e48b0bb7c88f"
+      "sha256": "8c6f5290a49a8965db190e6ce2bda0615b9bb936adf17dd8a8b11b75f0ae124c"
     },
     {
       "repository_path": "source/tools/tatto studio/web/mapping.mjs",
       "release_path": "tools/tatto studio/web/mapping.mjs",
-      "sha256": "936fd95b9a86faf4254cbc34ca05764869ce1d7209faa76878064af2b79b8839"
+      "sha256": "39158ff475a4cdc945117c5907a4b52238fd5d63ee09a1afb263c7569cf10836"
     },
     {
       "repository_path": "source/tools/tatto studio/web/neon-ui.mjs",
@@ -288,9 +399,29 @@
       "sha256": "6af68b687049309470b27e8d79ee275d54d95cd67148c9c57d1833d281afb978"
     },
     {
+      "repository_path": "source/tools/tatto studio/web/pick-index.mjs",
+      "release_path": "tools/tatto studio/web/pick-index.mjs",
+      "sha256": "061d18137c15937f87e78ef20c7fc2904ccc3917578da761582a3dd0b2e0ba2f"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/pixel-encoder.mjs",
+      "release_path": "tools/tatto studio/web/pixel-encoder.mjs",
+      "sha256": "4548ad4b0fab368467046a50e08b89aa4dcc83ee680accc180bd869459f06d99"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/pixel-fallback.mjs",
+      "release_path": "tools/tatto studio/web/pixel-fallback.mjs",
+      "sha256": "2e55bc0d603642eb86dc434dacdbc9a2740065119fdc9d7f3d9da12ad3277237"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/pixel-worker.mjs",
+      "release_path": "tools/tatto studio/web/pixel-worker.mjs",
+      "sha256": "3022dc01bb6ba644534ae2de5072b1943701d1863963bc2d067ba2fbcda2d4de"
+    },
+    {
       "repository_path": "source/tools/tatto studio/web/placement.mjs",
       "release_path": "tools/tatto studio/web/placement.mjs",
-      "sha256": "ecb62583898c835599abc98f39510663b9deb0feb92307b19849eda69f0dbd5e"
+      "sha256": "39608fb99172e05b9f7d42bf9b2ce3188541cddc8d3058cf9ae3fcd0424bbd70"
     },
     {
       "repository_path": "source/tools/tatto studio/web/portable-design.mjs",
@@ -308,6 +439,16 @@
       "sha256": "ad8d02acb5684b0d8202d3de744efe9e7537ae30e77546defd38bfed4ca691ca"
     },
     {
+      "repository_path": "source/tools/tatto studio/web/release-locales.mjs",
+      "release_path": "tools/tatto studio/web/release-locales.mjs",
+      "sha256": "a80549ed92b1f68dcab5aefd92a1e3e122fa9debc345f00c8b4f9c3b2527b087"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/repair-locales.mjs",
+      "release_path": "tools/tatto studio/web/repair-locales.mjs",
+      "sha256": "00544ccba0df958e56bca7ba23d7427760314d78cc052cb03c5af1bbf4beae15"
+    },
+    {
       "repository_path": "source/tools/tatto studio/web/resource-info.mjs",
       "release_path": "tools/tatto studio/web/resource-info.mjs",
       "sha256": "d62401003227449693395ac3261119cca6903008fc0b230f2b60236c059b4114"
@@ -315,12 +456,12 @@
     {
       "repository_path": "source/tools/tatto studio/web/setup.html",
       "release_path": "tools/tatto studio/web/setup.html",
-      "sha256": "25a109abcd08a456e4df972dabfe4ca7aaa0b7df742472bd98dd634256eb03ea"
+      "sha256": "fb2d4667a54d11012f5d7befde425f9669a7391a3c67acaeec9fecfa4ca68d4e"
     },
     {
       "repository_path": "source/tools/tatto studio/web/setup.mjs",
       "release_path": "tools/tatto studio/web/setup.mjs",
-      "sha256": "9e12eabbbf9e2dcf78fccb19c8a3a5e2eea874be4176af353bfe4672b6dbecd7"
+      "sha256": "c46d59f89b39f3d73673e7091ad9895c9cdae8b90e79136d80782c6b3aee91ef"
     },
     {
       "repository_path": "source/tools/tatto studio/web/skin-calibration-ui.mjs",
@@ -338,6 +479,16 @@
       "sha256": "15e70257fd0e3d1f03add0807e8f59dcd8f47ac0bfbfa4a9977964eee18e2157"
     },
     {
+      "repository_path": "source/tools/tatto studio/web/snapshot-locales.mjs",
+      "release_path": "tools/tatto studio/web/snapshot-locales.mjs",
+      "sha256": "e16a4a258ef86c445e8cdb43c381ca44fb34d040fb8685ad9774f87e4f3ba710"
+    },
+    {
+      "repository_path": "source/tools/tatto studio/web/snapshot-review.mjs",
+      "release_path": "tools/tatto studio/web/snapshot-review.mjs",
+      "sha256": "14d6659da60a724f54dda423786f4a2f425b54bd2479419e353f5c375fa9510c"
+    },
+    {
       "repository_path": "source/tools/tatto studio/web/stamp-hit.mjs",
       "release_path": "tools/tatto studio/web/stamp-hit.mjs",
       "sha256": "0f2211a91ab01163aa152263d387aa6f70abe46ef146f8358dcef3c30a1cfe91"
@@ -350,12 +501,12 @@
     {
       "repository_path": "source/tools/tatto studio/web/studio4.html",
       "release_path": "tools/tatto studio/web/studio4.html",
-      "sha256": "840679c99ef8db6b64d745dc38809966f191dd9e31156ba8cd36e0cadf1cf67d"
+      "sha256": "6402f55a602caba19d92304d14a931a0d2eeb1aec0ba222217daedf9550ac7e2"
     },
     {
       "repository_path": "source/tools/tatto studio/web/studio4.js",
       "release_path": "tools/tatto studio/web/studio4.js",
-      "sha256": "68340f72cf957c094f8266dec9c4e4b829267530a7158d90d5fae69e7d3ea12c"
+      "sha256": "4b389de189ae4e2fe32d6f656ddc0afc5cb29d38174e42bacd1a4b4bec34e384"
     },
     {
       "repository_path": "source/tools/tatto studio/web/style.css",
@@ -380,7 +531,7 @@
     {
       "repository_path": "source/tools/tatto studio/web/surface-warp-ui.mjs",
       "release_path": "tools/tatto studio/web/surface-warp-ui.mjs",
-      "sha256": "95909771e5b91bfd83f3628da713166d0af5a1e49a7c8474bdbac140833eee18"
+      "sha256": "3bc295157f10e84a571558973f42e3ab19beb34f23d7b2045d2e7405bf54acbc"
     },
     {
       "repository_path": "source/tools/tatto studio/web/surface-warp.css",
@@ -390,7 +541,7 @@
     {
       "repository_path": "source/tools/tatto studio/web/surface-warp.mjs",
       "release_path": "tools/tatto studio/web/surface-warp.mjs",
-      "sha256": "8d9275366e3fea7749f4b425cdece4ba18f94047c5e2705a5d44a3ac56571d5e"
+      "sha256": "24d479efa060d9771ffc6603a62e59facec3b67690796cad2adde938ab7b73b3"
     },
     {
       "repository_path": "source/tools/tatto studio/web/tattoo-regions.mjs",
@@ -415,7 +566,7 @@
     {
       "repository_path": "source/tools/tatto studio/web/uv-padding.mjs",
       "release_path": "tools/tatto studio/web/uv-padding.mjs",
-      "sha256": "d066961d78a39ce12e20c2dc2e754531360d78bfcba3566222f318aa4b4bce3b"
+      "sha256": "3c0dcd19cc071bfe2d7cd61756ef8383d832cf5a2a22a84fd9408736277f5b78"
     },
     {
       "repository_path": "source/tools/tatto studio/web/warp-locales.mjs",
@@ -425,7 +576,7 @@
     {
       "repository_path": "source/tools/tatto studio/windows_picker.py",
       "release_path": "tools/tatto studio/windows_picker.py",
-      "sha256": "1b84afc3b082763f4a39b533f61dfa03eaab6cd2815ec6ff97109369cc279ac6"
+      "sha256": "2ed5e772c62e138657beb2212d73bcc3145fcfbc0d7d925eb5ee1ab15489cd25"
     }
   ]
 }

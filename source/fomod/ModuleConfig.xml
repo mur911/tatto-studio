@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd"><moduleName>tatto studio</moduleName><requiredInstallFiles><folder source="archive" destination="archive" priority="0" /><folder source="tools" destination="tools" priority="0" /><folder source="bin" destination="bin" priority="0" /><folder source="r6" destination="r6" priority="0" /><folder source="licenses" destination="licenses" priority="0" /></requiredInstallFiles></config>
